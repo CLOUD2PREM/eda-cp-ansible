@@ -1,0 +1,13 @@
+---
+# Full deployment or reconfiguration of ONE environment.
+#   scripts/run.sh <environment> site
+#   scripts/run.sh <environment> site --tags kafka_broker          # one component (docs/TAGS.md upstream)
+#   scripts/run.sh production site --limit site_ysl                 # one site of a stretched cluster
+- name: Preflight
+  ansible.builtin.import_playbook: preflight.yml
+
+- name: FileConfigProvider secret files and references
+  ansible.builtin.import_playbook: file_secrets.yml
+
+- name: Confluent Platform (pinned confluent.platform collection)
+  ansible.builtin.import_playbook: confluent.platform.all

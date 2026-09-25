@@ -1,0 +1,33 @@
+---
+# =============================================================================
+# LAYER 3 - ENVIRONMENT IDENTITY: dev100
+# Values that identify the environment and its endpoints. TODO: replace example values.
+# =============================================================================
+iac_env: dev100
+
+# Cluster names (RBAC cluster registry, Control Center)
+kafka_broker_cluster_name: cp-dev100
+schema_registry_cluster_name: cp-dev100-schema-registry
+kafka_connect_cluster_name: cp-dev100-connect
+kafka_connect_group_id: cp-dev100-connect
+
+# Directory services (Active Directory, LDAPS)
+iac_ldap_url: ldaps.thy.com:636
+iac_ldap_bind_dn: "DN:uid=EDA_LDAP_BIND,ou=serviceaccount,o=thy"
+iac_ldap_user_search_base: "o=thy"
+iac_ldap_group_search_base: "ou=Groups,o=thy"
+kerberos:                         # merged key by key with the baseline hardening
+  realm: LAB.LOCAL
+  kdc_hostname: ad.lab.local
+  admin_hostname: ad.lab.local
+
+# Identity provider (OAuth). Client secrets live in 90-vault.yml.
+iac_oauth_base_url: https://sso.lab.local/oauth2
+iac_oauth_expected_audience: kafka-dev100
+iac_oauth_client_ids:
+  superuser: kafka-dev100-superuser
+  schema_registry: eda_schema_reg
+  kafka_connect: eda_kafka_conn
+  kafka_rest: eda_kafka_proxy
+  control_center: eda_kafka_c3
+
