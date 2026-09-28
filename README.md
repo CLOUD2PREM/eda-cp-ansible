@@ -59,6 +59,8 @@ Tier and topology are deliberately separate axes: `dr` is a *prod*-tier environm
 cluster with three brokers, so replication settings for two data centers cannot live in the prod tier.
 Sharing the `stretched-2dc` topology guarantees that `preprod` keeps the production topology.
 
+
+
 ### Example: where the values of one production broker come from
 
 Taken from `build/rendered/production/prod-dc2-broker-04.internal.net/` (see
@@ -154,6 +156,53 @@ below 3 / `min.insync.replicas=2` in any environment; stretched clusters use 4 (
 ├── bitbucket-pipelines.yml          # Bitbucket Pipelines equivalent
 └── docs/                            # open decisions, upstream notes, migration notes
 ```
+
+### How Overriding Works
+
+```
+Level 1: Role Defaults (Inside confluent.platform collection)
+   └─ Level 2: Inventory All Vars (inventories//group_vars/all.yml)
+       └─ Level 3: Inventory Group Vars (inventories//group_vars/kafka_broker.yml)
+           └─ Level 4: Host Vars (inventories//host_vars/.yml or in hosts.yml)
+               └─ Level 5: Tower Extra Variables (Runtime Prompt / Survey)
+```
+
+
+
+###### 1. Collection Role Defaults (Lowest Precedence)
+
+The `confluent.platform` collection roles define default values for hundreds of parameters inside their internal `defaults/main.yml` files.
+
+- **Example Default**: `ssl_enabled: false`
+
+###### 2. Environment Global Variables (inventories//group_vars/all.yml)
+When Ansible Tower runs a job using inventories/dev100/hosts.yml, Ansible automatically loads inventories/dev100/group_vars/all.yml. This overrides collection defaults across all hosts in dev100.
+
+- **Example Override**: ssl_enabled: true (overrides collection default false for all dev100 hosts).
+
+###### 3. Specific Component Group Variables (inventories//group_vars/.yml)
+Variables set in group-specific files override all.yml variables, but only for hosts belonging to that inventory group.
+
+- **Example**:
+  - inventories/prod/group_vars/all.yml sets kafka_broker_custom_properties: { auto.create.topics.enable: "true" }
+  - inventories/prod/group_vars/kafka_broker.yml sets kafka_broker_custom_properties: { auto.create.topics.enable: "false" }
+  - Result: kafka_broker nodes get "false", while non-broker nodes retain the global value.
+
+###### 4. Host-Level Variables (inventories//hosts.yml or host_vars/)
+Target specific parameters to individual servers (e.g., assigning fixed IDs or unique disk mount points).
+
+- **Example** in hosts.yml:
+
+```
+kafka_broker:
+  hosts:
+    broker1.dev.net:
+      kafka_broker_id: 101
+    broker2.dev.net:
+      kafka_broker_id: 102
+```
+
+#### 
 
 ## Getting started
 
