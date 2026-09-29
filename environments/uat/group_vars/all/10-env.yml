@@ -1,0 +1,32 @@
+---
+# =============================================================================
+# LAYER 3 - ENVIRONMENT IDENTITY: uat
+# Values that identify the environment and its endpoints. TODO: replace example values.
+# =============================================================================
+iac_env: uat
+
+# Cluster names (RBAC cluster registry, Control Center)
+kafka_broker_cluster_name: cp-uat
+schema_registry_cluster_name: cp-uat-schema-registry
+kafka_connect_cluster_name: cp-uat-connect
+kafka_connect_group_id: cp-uat-connect
+
+# Directory services (Active Directory, LDAPS)
+iac_ldap_url: ldaps://ad.uat.internal.net:636
+iac_ldap_bind_dn: "CN=ldap-bind-user,OU=ServiceAccounts,DC=uat,DC=internal,DC=net"
+iac_ldap_user_search_base: "OU=Users,DC=uat,DC=internal,DC=net"
+iac_ldap_group_search_base: "OU=Groups,DC=uat,DC=internal,DC=net"
+kerberos:                         # merged key by key with the baseline hardening
+  realm: UAT.INTERNAL.NET
+  kdc_hostname: ad.uat.internal.net
+  admin_hostname: ad.uat.internal.net
+
+# Identity provider (OAuth). Client secrets live in 90-vault.yml.
+iac_oauth_base_url: https://sso.uat.internal.net/oauth2
+iac_oauth_expected_audience: kafka-uat
+iac_oauth_client_ids:
+  superuser: kafka-uat-superuser
+  schema_registry: kafka-uat-schema-registry
+  kafka_connect: kafka-uat-connect
+  kafka_rest: kafka-uat-rest-proxy
+  control_center: kafka-uat-control-center
