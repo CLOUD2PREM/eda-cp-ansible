@@ -1,0 +1,10 @@
+---
+# =============================================================================
+# LAYER 3 - ENVIRONMENT OVERRIDES: uat
+# Only what makes THIS environment different from shared/base + tier (nonprod) + topology (single-site).
+# Examples:
+#   iac_kafka_broker_heap: "-Xms8g -Xmx8g"
+#   kafka_broker_custom_properties:
+#     log.retention.hours: 24
+# =============================================================================
+{}
