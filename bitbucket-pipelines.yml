@@ -4,7 +4,7 @@
 # Runners: self-hosted Linux Shell runners inside the corporate network (Nexus access), label "kafka-iac".
 # Repository settings > Deployments: create one deployment environment per inventory directory
 #   (dev100, dev, test, qa, preprod, production, dr - the names must match exactly) with
-#   secured deployment variables: ANSIBLE_VAULT_PASSWORD, ANSIBLE_SSH_PRIVATE_KEY (optional),
+#   secured deployment variables: IAC_SECRET_* (names: secrets.env.example), ANSIBLE_SSH_PRIVATE_KEY (optional),
 #   deployment variable SSH_KNOWN_HOSTS (known_hosts entries of the managed hosts).
 #   preprod, production, dr: allow main only and restrict who may deploy (deployment permissions).
 # Operations are started manually: Pipelines > Run pipeline > branch main > custom: <environment>.
@@ -42,7 +42,7 @@ definitions:
           - export IAC_SECRETS_DIR="$BITBUCKET_CLONE_DIR/.secrets/$TARGET_ENV"
           - scripts/bootstrap.sh
           - scripts/validate.sh --env "$TARGET_ENV" --no-lint
-          # TODO(OD-04): fetch the keytabs (kafka-<inventory_hostname>.keytab) into $IAC_SECRETS_DIR.
+          # Control node secret files of $TARGET_ENV go into $IAC_SECRETS_DIR (none at the moment).
           - install -d -m 700 "$IAC_SECRETS_DIR"
           - scripts/run.sh "$TARGET_ENV" "$PLAYBOOK"
         after-script:

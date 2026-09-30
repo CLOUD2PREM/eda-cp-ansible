@@ -1,0 +1,39 @@
+---
+# dev100 - LAB copy of the THY dev100 layout (three servers).
+# Every server runs a KRaft controller and a broker (iac_kraft_colocated, node_id stays UNSET),
+# Schema Registry, Kafka Connect and REST Proxy. Control Center runs on the third server.
+# Connection: Ansible logs in as cloud-user with the key of each host and becomes root (ansible_become).
+all:
+  children:
+    env_dev100:
+      vars:
+        ansible_user: cloud-user
+      children:
+        kafka_controller:
+          hosts:
+            cp-node1.lab.local: {ansible_host: 10.0.0.140, ansible_ssh_private_key_file: /home/cloud-user/keys/cp-test-1.key}
+            cp-node2.lab.local: {ansible_host: 10.0.0.47, ansible_ssh_private_key_file: /home/cloud-user/keys/cp-test-2.key}
+            cp-node3.lab.local: {ansible_host: 10.0.0.104, ansible_ssh_private_key_file: /home/cloud-user/keys/cp-test-3.key}
+        kafka_broker:
+          hosts:
+            cp-node1.lab.local:
+            cp-node2.lab.local:
+            cp-node3.lab.local:
+        schema_registry:
+          hosts:
+            cp-node1.lab.local:
+            cp-node2.lab.local:
+            cp-node3.lab.local:
+        kafka_connect:
+          hosts:
+            cp-node1.lab.local:
+            cp-node2.lab.local:
+            cp-node3.lab.local:
+        kafka_rest:
+          hosts:
+            cp-node1.lab.local:
+            cp-node2.lab.local:
+            cp-node3.lab.local:
+        control_center_next_gen:
+          hosts:
+            cp-node3.lab.local:

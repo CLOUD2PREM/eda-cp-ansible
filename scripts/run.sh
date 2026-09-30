@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # Single entry point for every playbook run against an environment (local shell and CI).
+# Tower job templates do not use it: they run playbooks/<playbook>.yml directly (README, "Running from Tower").
 #
 # Usage: scripts/run.sh <environment> <playbook> [additional ansible-playbook arguments]
 #   <playbook>  site | health_check | restart | validate_hosts | support_bundle | preflight | render_config
@@ -9,8 +10,8 @@
 #   ANSIBLE_VAULT_PASSWORD       vault password of <environment> (CI secret)
 #   ANSIBLE_VAULT_IDENTITY_LIST  alternative for interactive use, e.g. production@prompt
 #   ANSIBLE_SSH_PRIVATE_KEY      SSH private key content (CI secret); otherwise the runner identity is used
-#   IAC_SECRETS_DIR              control node secret files of <environment>: kafka-<inventory_hostname>.keytab
-#                                for every controller and broker
+#   IAC_SECRET_*                 secrets of <environment> (secrets.env.example, shared/base/15-secrets.yml)
+#   IAC_SECRETS_DIR              control node secret files of <environment> (none at the moment)
 #   SSH_KNOWN_HOSTS              known_hosts content for the managed hosts (host keys stay verified)
 #   IAC_SUPPORT_BUNDLE_DIR       where the failure callback writes support bundles
 #   AUTO_SUPPORT_BUNDLE=false    do not collect a support bundle automatically when the run fails
