@@ -4,24 +4,27 @@
 #
 # Target model:
 #   client / application traffic    -> SASL/OAUTHBEARER (corporate identity provider)
-#   inter-broker and KRaft traffic  -> SASL/GSSAPI (Kerberos, Active Directory KDC)
+#   broker and KRaft traffic        -> SASL_SSL: SCRAM-SHA-512, PLAIN between the KRaft controllers only
 #   authorization                   -> Confluent RBAC (MDS) backed by Active Directory (LDAPS)
-#   passwords in generated files    -> FileConfigProvider, one file per component (playbooks/file_secrets.yml)
+#   passwords in generated files    -> ${env:...} references (EnvVarConfigProvider, playbooks/config_secrets.yml)
+#   secrets of this repository      -> environment variables IAC_SECRET_* (00-base/15-secrets.yml), no Ansible Vault
+#   Kerberos / GSSAPI               -> not used anywhere
 #
-# The cp-ansible 8.3.1 default listeners already implement this model, no custom listeners are needed:
+# The listeners are written out explicitly (30-kafka-controller.yml, 31-kafka-broker.yml), for every environment:
 #   INTERNAL   :9092 -> OAUTHBEARER when auth_mode is ldap / oauth / ldap_with_oauth  (applications, CP components)
-#   BROKER     :9091 -> sasl_protocol                                                (broker to broker)
-#   CONTROLLER :9093 -> kafka_controller_sasl_protocol (defaults to sasl_protocol)
+#   BROKER     :9091 -> SCRAM-SHA-512 (sasl_protocol: scram)                          (broker to broker)
+#   CONTROLLER :9093 -> PLAIN between controllers, SCRAM-SHA-512 from the brokers (kafka_controller_sasl_protocol)
 #
 # Open decisions: OD-01 account naming, OD-02 auth mode, OD-03 MDS topology,
-#                 OD-04 certificate/keytab source, OD-05 MDS super user identity
+#                 OD-04 certificate source, OD-05 MDS super user identity
 # =============================================================================
 
 # ---- Secrets registry --------------------------------------------------------
-# vault_* variables every environment must provide in group_vars/all/90-vault.yml.
+# Secrets every environment must provide. The vault_* names are the secret namespace of this repository;
+# their values come from environment variables (15-secrets.yml, template: secrets.env.example).
 # A DICTIONARY on purpose: tiers and environments add entries (lists would be replaced, not merged).
-# Used by preflight (deploy mode: present and not a placeholder) and by static validation
-# (CI replaces every registered secret with a placeholder, so no vault password is needed).
+# Used by preflight (deploy mode: not empty and not a placeholder) and by static validation
+# (CI replaces every registered secret with a placeholder, so no secret is needed).
 iac_required_secrets:
   vault_ldap_bind_password: true
   vault_mds_super_user_password: true
@@ -35,25 +38,38 @@ iac_required_secrets:
   vault_kafka_connect_oauth_client_secret: true
   vault_kafka_rest_oauth_client_secret: true
   vault_control_center_oauth_client_secret: true
+  vault_kafka_broker_scram_password: true
+  vault_kafka_controller_plain_password: true
 
 # ---- Secret files on the control node ------------------------------------------
-# cp-ansible reads these files on the CONTROL NODE and copies them to the hosts:
-#   kafka-<inventory_hostname>.keytab   Kerberos keytab of every controller and broker
-# The pipeline materialises them from the secret store into IAC_SECRETS_DIR before the run
-# (default: .secrets/<environment>, git-ignored). Preflight checks that they exist.
-iac_secrets_dir: "{{ lookup('ansible.builtin.env', 'IAC_SECRETS_DIR', default=inventory_dir ~ '/../../.secrets/' ~ iac_env) }}"
+# Files cp-ansible would read on the CONTROL NODE and copy to the hosts (e.g. the Secret Protection
+# security.properties). None is needed at the moment: no Kerberos keytabs (SCRAM/PLAIN), the host certificates
+# are placed on the hosts. The pipeline materialises such files into IAC_SECRETS_DIR before the run
+# (default: .secrets/<environment> in the repository root, git-ignored). The default is derived from playbook_dir,
+# not from inventory_dir: Tower hands the job a generated inventory outside the project.
+iac_secrets_dir: "{{ lookup('ansible.builtin.env', 'IAC_SECRETS_DIR', default=playbook_dir ~ '/../.secrets/' ~ iac_env) }}"
 
-# ---- Passwords in generated files: FileConfigProvider ------------------------------
+# ---- Passwords in generated files ----------------------------------------------------
 # cp-ansible writes every password-like value (keystore passwords, JAAS configs, basic auth user info, LDAP
-# credentials, license) into the properties files. playbooks/file_secrets.yml (imported by site.yml) moves
-# these values into one file per component on every host, readable by the service user only, and makes the
-# roles write ${file:<file>:<key>} references instead. The key patterns are the ones cp-ansible's Secret
-# Protection encrypts (roles/common/tasks/secrets_protection.yml), so both cover the same keys.
+# credentials, license) into the properties files. playbooks/config_secrets.yml (imported by site.yml) takes
+# these values out of the properties files and makes the roles write references instead:
+#   provider env  (default)  ${env:CP_SECRET_<KEY>}; each service gets a systemd EnvironmentFile
+#                            <iac_config_secrets_dir>/<component>.env (iac_config_secrets_owner, 0600).
+#                            systemctl show lists only the path of that file, never its values.
+#   provider file            ${file:<iac_config_secrets_dir>/<component>.properties:<key>} (service user, 0400)
+# client.properties (kafka-* CLI tools, cp-ansible health checks) always uses provider file: the tools do not
+# run with the environment of the service.
+# The key patterns are the ones cp-ansible's Secret Protection encrypts (roles/common/tasks/secrets_protection.yml).
 # A changed secret is written by site but only read at startup: run the restart playbook afterwards.
-# Kafka's FileConfigProvider only reads files below allowed.paths (iac_file_secrets_dir).
-iac_file_secrets_enabled: true
-iac_file_secrets_dir: /var/ssl/private/iac-secrets
-iac_file_secrets_key_patterns:
+iac_config_secrets_enabled: true
+iac_config_secrets_provider: env
+iac_config_secrets_env_prefix: CP_SECRET_
+iac_config_secrets_dir: /var/ssl/private/iac-secrets
+# Owner of the secret directory and of the environment files: root, because systemd (the system manager) reads the
+# EnvironmentFile before it starts the service as its service account. A rootless deployment would use the deploy user.
+iac_config_secrets_owner: "{{ deployment_user if rootless_enabled | bool else 'root' }}"
+iac_config_secrets_group: "{{ deployment_group if rootless_enabled | bool else 'root' }}"
+iac_config_secrets_key_patterns:
   - '.*password.*'
   - '.*basic.auth.user.info.*'
   - '^ldap.java.naming.security.credentials$'
@@ -67,37 +83,94 @@ regenerate_masterkey: false
 # ---- TLS -------------------------------------------------------------------
 # Host certificates are issued by the corporate CA and placed on the hosts BEFORE the run
 # (ssl_custom_certs_remote_src: true means the paths below are paths on the target hosts).
+# The OS team places them in iac_host_certs_dir (root); cp-ansible reads them as root and builds the keystores of
+# every component below ssl_file_dir (cp-ansible default /var/ssl/private).
+#   ca-bundle.crt              CA chain: issuing (intermediate) CA and root CA, PEM
+#   <inventory_hostname>.crt   host certificate, PEM; SAN with the host name; EKU serverAuth (no listener
+#                              requires client certificates, so clientAuth is not needed)
+#   <inventory_hostname>.key   private key, PEM, readable by root only (0600)
+iac_host_certs_dir: /var/ssl/private
 ssl_enabled: true
 ssl_custom_certs: true
 ssl_custom_certs_remote_src: true
-ssl_ca_cert_filepath: /var/ssl/private/ca-bundle.crt
-ssl_signed_cert_filepath: "/var/ssl/private/{{ inventory_hostname }}.crt"
-ssl_key_filepath: "/var/ssl/private/{{ inventory_hostname }}.key"
+ssl_ca_cert_filepath: "{{ iac_host_certs_dir }}/ca-bundle.crt"
+ssl_signed_cert_filepath: "{{ iac_host_certs_dir }}/{{ inventory_hostname }}.crt"
+ssl_key_filepath: "{{ iac_host_certs_dir }}/{{ inventory_hostname }}.key"
 # ssl_key_password: "{{ vault_ssl_key_password }}"     # only if the private keys are encrypted
 
-# ---- Kerberos (inter-broker and KRaft) ------------------------------------------
-sasl_protocol: kerberos
-kerberos_configure: true
-kerberos:
-  realm: INTERNAL.NET                    # set per environment (10-env.yml) together with the KDC hosts
-  dns_lookup_realm: false
-  dns_lookup_kdc: false
-  ticket_lifetime: 24h
-  forwardable: true
-  udp_preference_limit: 1                # TCP only: tickets with large PACs do not fit into UDP datagrams
-  # Active Directory issues AES-SHA1 tickets (RFC 3962). Put the RFC 8009 types
-  # (aes256-cts-hmac-sha384-192 aes128-cts-hmac-sha256-128) first only if the KDC supports them.
-  default_tkt_enctypes: "aes256-cts-hmac-sha1-96 aes128-cts-hmac-sha1-96"
-  default_tgs_enctypes: "aes256-cts-hmac-sha1-96 aes128-cts-hmac-sha1-96"
-  permitted_enctypes: "aes256-cts-hmac-sha1-96 aes128-cts-hmac-sha1-96"
-  canonicalize: false
-  allow_weak_crypto: false
-# *_kerberos_keytab_path is a path on the ANSIBLE CONTROL NODE: the cp-ansible kerberos role copies the
-# keytab from there to *_keytab_path on the host (copy without remote_src).
-kafka_controller_kerberos_keytab_path: "{{ iac_secrets_dir }}/kafka-{{ inventory_hostname }}.keytab"
-kafka_controller_kerberos_principal: "kafka/{{ inventory_hostname }}@{{ kerberos.realm }}"
-kafka_broker_kerberos_keytab_path: "{{ iac_secrets_dir }}/kafka-{{ inventory_hostname }}.keytab"
-kafka_broker_kerberos_principal: "kafka/{{ inventory_hostname }}@{{ kerberos.realm }}"
+# ---- Broker and KRaft authentication: SASL_SSL with SCRAM-SHA-512 and PLAIN ----------------
+#   broker <-> broker, controller -> broker   BROKER listener :9091       SCRAM-SHA-512
+#   broker -> controller                      CONTROLLER listener :9093   SCRAM-SHA-512
+#   controller <-> controller                 CONTROLLER listener :9093   PLAIN
+# KRaft controllers cannot authenticate each other with SCRAM: its credentials live in the metadata log that the
+# controllers serve (Confluent: "SCRAM is not supported for KRaft controller-to-controller communication"; the
+# documented setting is kafka_controller_sasl_protocol: plain,scram). GSSAPI is not used anywhere.
+# The FIRST value of kafka_controller_sasl_protocol is what controllers AND brokers use towards the controllers;
+# sasl.mechanism.controller.protocol in shared/base/31-kafka-broker.yml keeps the brokers on SCRAM-SHA-512, so
+# PLAIN is only used between the controllers.
+sasl_protocol: scram
+kafka_controller_sasl_protocol: plain,scram
+# SCRAM users live in the KRaft metadata: cp-ansible adds admin when it formats the controllers' storage
+# (kafka-storage format --add-scram) and creates all of them with kafka-configs after the first start.
+# PLAIN users live in the JAAS configuration of the CONTROLLER listener (user_<principal>="<password>").
+# admin is the identity brokers (SCRAM) and controllers (PLAIN) log in with. Both are called kafka: cp-ansible
+# adds User:<principal> of the first mechanism to super.users, and a controller must accept a broker that logs
+# in with the other mechanism.
+# cp-ansible also creates its default users (client, schema_registry, ...) with PUBLIC default passwords
+# (client-secret, ...). The components authenticate with OAUTHBEARER on INTERNAL :9092 and never use them, so
+# their passwords are derived from the admin passwords: nobody knows them and they need no secret of their own.
+# The passwords are written into JAAS configurations and kafka-configs arguments: letters and digits only
+# (preflight checks it).
+sasl_scram_users:
+  admin:
+    principal: kafka
+    password: "{{ vault_kafka_broker_scram_password }}"
+  client:
+    principal: client
+    password: "{{ (vault_kafka_broker_scram_password ~ ':client') | hash('sha256') }}"
+  schema_registry:
+    principal: schema_registry
+    password: "{{ (vault_kafka_broker_scram_password ~ ':schema_registry') | hash('sha256') }}"
+  kafka_connect:
+    principal: kafka_connect
+    password: "{{ (vault_kafka_broker_scram_password ~ ':kafka_connect') | hash('sha256') }}"
+  kafka_rest:
+    principal: kafka_rest
+    password: "{{ (vault_kafka_broker_scram_password ~ ':kafka_rest') | hash('sha256') }}"
+  ksql:
+    principal: ksql
+    password: "{{ (vault_kafka_broker_scram_password ~ ':ksql') | hash('sha256') }}"
+  control_center_next_gen:
+    principal: control_center
+    password: "{{ (vault_kafka_broker_scram_password ~ ':control_center_next_gen') | hash('sha256') }}"
+  kafka_connect_replicator:
+    principal: kafka_connect_replicator
+    password: "{{ (vault_kafka_broker_scram_password ~ ':kafka_connect_replicator') | hash('sha256') }}"
+sasl_plain_users:
+  admin:
+    principal: kafka
+    password: "{{ vault_kafka_controller_plain_password }}"
+  client:
+    principal: client
+    password: "{{ (vault_kafka_controller_plain_password ~ ':client') | hash('sha256') }}"
+  schema_registry:
+    principal: schema_registry
+    password: "{{ (vault_kafka_controller_plain_password ~ ':schema_registry') | hash('sha256') }}"
+  kafka_connect:
+    principal: kafka_connect
+    password: "{{ (vault_kafka_controller_plain_password ~ ':kafka_connect') | hash('sha256') }}"
+  kafka_rest:
+    principal: kafka_rest
+    password: "{{ (vault_kafka_controller_plain_password ~ ':kafka_rest') | hash('sha256') }}"
+  ksql:
+    principal: ksql
+    password: "{{ (vault_kafka_controller_plain_password ~ ':ksql') | hash('sha256') }}"
+  control_center_next_gen:
+    principal: control_center
+    password: "{{ (vault_kafka_controller_plain_password ~ ':control_center_next_gen') | hash('sha256') }}"
+  kafka_connect_replicator:
+    principal: kafka_connect_replicator
+    password: "{{ (vault_kafka_controller_plain_password ~ ':kafka_connect_replicator') | hash('sha256') }}"
 
 # ---- Authorization: RBAC + OAuth ---------------------------------------------------
 rbac_enabled: true
@@ -117,7 +190,7 @@ oauth_groups_claim: groups
 oauth_idp_cert_path: "{{ iac_control_node_ca_cert }}"
 iac_control_node_ca_cert: /etc/pki/ca-trust/source/anchors/corporate-root-ca.crt   # TODO: real file on the runner
 
-# One IdP client per component. Client IDs are plain per-environment values, secrets live in vault.
+# One IdP client per component. Client IDs are plain values, secrets come from IAC_SECRET_* (15-secrets.yml).
 oauth_superuser_client_id: "{{ iac_oauth_client_ids.superuser }}"
 oauth_superuser_client_password: "{{ vault_oauth_superuser_client_secret }}"
 schema_registry_oauth_user: "{{ iac_oauth_client_ids.schema_registry }}"
@@ -159,6 +232,10 @@ kafka_broker_custom_properties:
   ldap.java.naming.security.credentials: "{{ vault_ldap_bind_password }}"
   ldap.search.mode: USERS
   ldap.user.search.base: "{{ iac_ldap_user_search_base }}"
+  # SUBTREE: Confluent's default (1, ONELEVEL) only finds entries directly below the search base, so accounts in
+  # sub-OUs (e.g. uid=svc,ou=serviceaccount,o=corp under base o=corp) are never found and MDS logins fail.
+  ldap.user.search.scope: 2
+  ldap.group.search.scope: 2
   ldap.user.name.attribute: sAMAccountName
   ldap.user.object.class: user
   ldap.user.memberof.attribute: memberOf

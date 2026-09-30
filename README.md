@@ -1,7 +1,7 @@
 # enterprise-kafka-iac
 
 Multi-environment deployment repository for **Confluent Platform 8.3 (KRaft)**, built on the official
-cp-ansible collection **`confluent.platform` v8.3.1**. The collection is consumed as a pinned dependency
+cp-ansible collection **`confluent.platform` v8.3.2**. The collection is consumed as a pinned dependency
 and is never forked or edited.
 
 Seven environments — `dev100`, `dev`, `test`, `qa`, `preprod`, `production`, `dr` — share one baseline,
@@ -22,11 +22,12 @@ Control Center Next Gen) can be overridden per environment, per data center and 
 2. [Environments](#environments)
 3. [Repository layout](#repository-layout)
 4. [Getting started](#getting-started)
-5. [Day-to-day operations](#day-to-day-operations)
-6. [Where does a change go?](#where-does-a-change-go)
-7. [Guard rails](#guard-rails)
-8. [CI/CD](#cicd)
-9. [Upgrading cp-ansible](#upgrading-cp-ansible)
+5. [Running from Tower](#running-from-tower)
+6. [Day-to-day operations](#day-to-day-operations)
+7. [Where does a change go?](#where-does-a-change-go)
+8. [Guard rails](#guard-rails)
+9. [CI/CD](#cicd)
+10. [Upgrading cp-ansible](#upgrading-cp-ansible)
 
 ---
 
@@ -41,7 +42,7 @@ The design uses nothing but standard Ansible variable precedence plus `hash_beha
 | 1 | Organisation baseline | `shared/base/` (linked as `group_vars/all/00-base`) | every environment |
 | 2a | Tier | `shared/tiers/{nonprod,prod}/` (linked as `05-tier`) | class of environment |
 | 2b | Topology | `shared/topologies/{single-site,stretched-2dc}/` (linked as `06-topology`) | shape of the cluster |
-| 3 | Environment | `environments/<env>/group_vars/all/10-env.yml`, `20-components.yml`, `90-vault.yml` | one environment |
+| 3 | Environment | `environments/<env>/group_vars/all/10-env.yml`, `20-components.yml` | one environment |
 | 4 | Site | `environments/<env>/group_vars/site_<code>.yml` | one data center of a stretched cluster |
 | 5 | Host | `environments/<env>/hosts.yml`, `environments/<env>/host_vars/<host>.yml` | one server |
 
@@ -59,8 +60,6 @@ Tier and topology are deliberately separate axes: `dr` is a *prod*-tier environm
 cluster with three brokers, so replication settings for two data centers cannot live in the prod tier.
 Sharing the `stretched-2dc` topology guarantees that `preprod` keeps the production topology.
 
-
-
 ### Example: where the values of one production broker come from
 
 Taken from `build/rendered/production/prod-dc2-broker-04.internal.net/` (see
@@ -68,7 +67,7 @@ Taken from `build/rendered/production/prod-dc2-broker-04.internal.net/` (see
 
 | Final value | Source |
 |---|---|
-| `log.dirs=/var/lib/kafka/data` | layer 1 — `shared/base/31-kafka-broker.yml` |
+| `log.dirs=/kafka/data/broker` | layer 1 — `shared/base/31-kafka-broker.yml` (`iac_data_dir` from `00-platform.yml`) |
 | `ldap.java.naming.provider.url=ldaps://ad.prod.internal.net:636` | layer 1 (`10-security.yml`) using `iac_ldap_url` from layer 3 |
 | `log.retention.hours=168`, `KAFKA_HEAP_OPTS=-Xms6g -Xmx6g ...` | layer 2a — `shared/tiers/prod/00-tier.yml` |
 | `default.replication.factor=4`, `offsets.topic.replication.factor=4`, `confluent.metadata.topic.replication.factor=4`, `replica.selector.class=...RackAwareReplicaSelector` | layer 2b — `shared/topologies/stretched-2dc/` |
@@ -91,7 +90,7 @@ An environment override looks like `environments/dev100/group_vars/all/20-compon
 4. **Use the cp-ansible extension points**: `<component>_custom_properties`,
    `<component>_service_environment_overrides`, `<component>_custom_java_args`, `<component>_copy_files`, ...
 5. **Anything a lower layer may extend must be a dictionary** (see `iac_required_secrets`).
-6. **Own variables use the `iac_` prefix, secrets the `vault_` prefix** (`cp_*` names are used by the
+6. **Own variables use the `iac_` prefix, secrets the `vault_` prefix** (values from `IAC_SECRET_*`, see Secrets; `cp_*` names are used by the
    collection itself). Every other variable must be known to the pinned collection —
    `scripts/check-vars.py` rejects typos, which Ansible would otherwise ignore silently.
 7. **Layer link names contain no dot** (`00-base`, not `00-base.yml`): Ansible only descends into
@@ -121,7 +120,9 @@ below 3 / `min.insync.replicas=2` in any environment; stretched clusters use 4 (
 ├── ansible.cfg                      # hash_behaviour=merge, pinned collections path, YAML output, no default inventory
 ├── requirements.txt                 # control node Python dependencies (ansible-core 2.18)
 ├── requirements-dev.txt             # + yamllint, ansible-lint (pinned)
-├── collections/requirements.yml     # pinned confluent.platform 8.3.1 (+ ansible.posix, community.general)
+├── collections/requirements.yml     # pinned confluent.platform 8.3.2 (+ ansible.posix, community.general)
+├── execution-environment.yml        # Tower: execution environment image (ansible-builder)
+├── tower/                           # Tower: credential type of the IAC_SECRET_* variables
 ├── shared/
 │   ├── base/                        # layer 1: platform, security, observability, one file per component
 │   ├── tiers/{nonprod,prod}/        # layer 2a: heaps, retention, license requirement
@@ -134,19 +135,18 @@ below 3 / `min.insync.replicas=2` in any environment; stretched clusters use 4 (
 │   │   ├── 06-topology -> ../../../../shared/topologies/<topology>
 │   │   ├── 10-env.yml               # identity and endpoints of the environment
 │   │   ├── 20-components.yml        # component overrides of the environment
-│   │   └── 90-vault.yml.example     # template of the secrets file
 │   ├── group_vars/site_<code>.yml   # stretched environments only (broker.rack)
 │   └── host_vars/                   # host specific values
 ├── playbooks/
-│   ├── site.yml                     # preflight + file_secrets + confluent.platform.all
-│   ├── file_secrets.yml             # FileConfigProvider secret files of the hosts
+│   ├── site.yml                     # preflight + config_secrets + confluent.platform.all
+│   ├── config_secrets.yml           # secret files of the hosts, ${env:...} references
 │   ├── health_check.yml, restart.yml, validate_hosts.yml, support_bundle.yml
 │   ├── preflight.yml                # guard rails
 │   ├── render_config.yml            # effective configuration without touching hosts
 │   └── tasks/, files/               # helpers
 ├── scripts/
 │   ├── bootstrap.sh                 # virtualenv + pinned collections
-│   ├── run.sh                       # the only way to run a playbook against an environment
+│   ├── run.sh                       # command line runs of a playbook against an environment (Tower: job templates)
 │   ├── validate.sh                  # static validation (CI)
 │   ├── render-config.sh             # effective configuration -> build/rendered
 │   ├── config-diff.sh               # "plan": effective configuration diff between two revisions
@@ -157,53 +157,6 @@ below 3 / `min.insync.replicas=2` in any environment; stretched clusters use 4 (
 └── docs/                            # open decisions, upstream notes, migration notes
 ```
 
-### How Overriding Works
-
-```
-Level 1: Role Defaults (Inside confluent.platform collection)
-   └─ Level 2: Inventory All Vars (inventories//group_vars/all.yml)
-       └─ Level 3: Inventory Group Vars (inventories//group_vars/kafka_broker.yml)
-           └─ Level 4: Host Vars (inventories//host_vars/.yml or in hosts.yml)
-               └─ Level 5: Tower Extra Variables (Runtime Prompt / Survey)
-```
-
-
-
-###### 1. Collection Role Defaults (Lowest Precedence)
-
-The `confluent.platform` collection roles define default values for hundreds of parameters inside their internal `defaults/main.yml` files.
-
-- **Example Default**: `ssl_enabled: false`
-
-###### 2. Environment Global Variables (inventories//group_vars/all.yml)
-When Ansible Tower runs a job using inventories/dev100/hosts.yml, Ansible automatically loads inventories/dev100/group_vars/all.yml. This overrides collection defaults across all hosts in dev100.
-
-- **Example Override**: ssl_enabled: true (overrides collection default false for all dev100 hosts).
-
-###### 3. Specific Component Group Variables (inventories//group_vars/.yml)
-Variables set in group-specific files override all.yml variables, but only for hosts belonging to that inventory group.
-
-- **Example**:
-  - inventories/prod/group_vars/all.yml sets kafka_broker_custom_properties: { auto.create.topics.enable: "true" }
-  - inventories/prod/group_vars/kafka_broker.yml sets kafka_broker_custom_properties: { auto.create.topics.enable: "false" }
-  - Result: kafka_broker nodes get "false", while non-broker nodes retain the global value.
-
-###### 4. Host-Level Variables (inventories//hosts.yml or host_vars/)
-Target specific parameters to individual servers (e.g., assigning fixed IDs or unique disk mount points).
-
-- **Example** in hosts.yml:
-
-```
-kafka_broker:
-  hosts:
-    broker1.dev.net:
-      kafka_broker_id: 101
-    broker2.dev.net:
-      kafka_broker_id: 102
-```
-
-#### 
-
 ## Getting started
 
 ### Prerequisites
@@ -212,17 +165,41 @@ kafka_broker:
   ansible-core 2.18; on RHEL 9 install `python3.12` and run `PYTHON=python3.12 scripts/bootstrap.sh`).
 - Git with symlink support. On Windows use WSL or `git config core.symlinks true`; without it the layer links
   are checked out as plain files and preflight stops.
-- Access to Nexus: PyPI proxy, a raw repository with the collection tarballs, a mirror/proxy of
-  `https://packages.confluent.io` and of the Confluent CLI (see `shared/base/00-platform.yml`).
-- SSH access and privilege escalation (`sudo`) on the managed hosts, their host keys in `known_hosts`.
+- Access to Nexus: PyPI proxy, a raw repository with the collection tarballs and a raw repository with the
+  Confluent archives (`iac_artifact_url`, see `shared/base/00-platform.yml`).
+- SSH access to the managed hosts as the automation account of the environment (key-based), their host keys in
+  `known_hosts`, and **general** privilege escalation for that account (passwordless `sudo`, or the become
+  password in the Tower machine credential). A sudoers file that allows single commands is not enough: Ansible
+  runs its modules as temporary scripts ("Privilege escalation must be general", Ansible documentation).
+
+### Host prerequisites (once per host)
+
+With root, cp-ansible creates the service accounts (`cp-kafka`, `cp-schema-registry`, ...), the directories, the
+system units (`confluent-server`, `confluent-kcontroller`, ...) and applies the kernel settings itself. What the
+OS team provides before the first run:
+
+- the automation account with its SSH key and general `sudo` (above);
+- Java 21 (`java-21-openjdk-headless`, `custom_java_path` in `shared/base/00-platform.yml`);
+- the host certificate files in `/var/ssl/private/` (root, key `0600`; see `shared/base/10-security.yml`, TLS);
+- the data and log disks mounted at `/kafka/data` and `/var/log/kafka` (`iac_data_dir`, `iac_log_dir`);
+- access to the RHEL repositories (cp-ansible installs `python3-pip` and a few packages) and HTTPS to the raw
+  repository of the Confluent archives. Hosts without PyPI access: `--skip-tags pip-package` (then
+  `python3-cryptography` must be installed; cp-ansible otherwise runs `pip install --upgrade pip`).
+
+```bash
+scripts/run.sh <environment> validate_hosts     # OS, disk, memory; read-only
+```
+
+(`rootless_enabled: true` would install and run everything as one unprivileged user without sudo; the checks of
+that mode stay in `playbooks/validate_hosts.yml` and `playbooks/preflight.yml`, they are skipped otherwise.)
 
 ### Publish the collections to Nexus (once per version)
 
 From a machine with internet access:
 
 ```bash
-git clone --branch v8.3.1 --depth 1 https://github.com/confluentinc/cp-ansible.git
-ansible-galaxy collection build cp-ansible                       # -> confluent-platform-8.3.1.tar.gz
+git clone --branch v8.3.2 --depth 1 https://github.com/confluentinc/cp-ansible.git
+ansible-galaxy collection build cp-ansible                       # -> confluent-platform-8.3.2.tar.gz
 ansible-galaxy collection download ansible.posix:2.1.0 community.general:12.6.5 -p ./collections-download
 # upload the three tarballs to the Nexus raw repository referenced in collections/requirements.yml
 ```
@@ -235,61 +212,144 @@ scripts/bootstrap.sh --dev      # .venv, Python requirements, linters and the pi
 scripts/validate.sh             # lint, variable names, syntax, preflight (static) and rendering of all environments
 ```
 
+On RHEL 9 run it with `PYTHON=python3.12`. A control node that gets the collections from somewhere else than the
+Nexus raw repository (e.g. Ansible Galaxy) sets `IAC_COLLECTIONS_REQUIREMENTS` to a requirements file with the same
+pinned versions. Tower needs no bootstrap: see [Running from Tower](#running-from-tower).
+
 ### Secrets
 
-- **One vault identity per environment**, named like the environment. `ansible.cfg` sets
-  `vault_id_match = True`, so a value is only decrypted with its own identity.
-- **Encrypt values, not files.** Copy `90-vault.yml.example` to `90-vault.yml` and replace each value with the
-  output of:
+- **No secret in git, no Ansible Vault.** Every secret is an environment variable of the process that runs
+  `ansible-playbook`: `IAC_SECRET_<NAME>` feeds `vault_<name>` (`shared/base/15-secrets.yml`; the `vault_`
+  prefix is only the secret namespace). The names are the same in every environment, the values belong to the
+  environment of the run. `secrets.env.example` lists all of them.
 
   ```bash
-  ansible-vault encrypt_string --vault-id production@prompt --encrypt-vault-id production \
-    --name vault_mds_super_user_password
+  install -d -m 700 ~/.secrets && install -m 600 secrets.env.example ~/.secrets/dev100.env   # fill in the values
+  set -a; . ~/.secrets/dev100.env; set +a                                                     # in the shell of the run
   ```
 
-  Variable names stay reviewable in pull requests, and validation/rendering run without any vault password:
-  encrypted values are only decrypted when used, and static validation replaces them with placeholders.
+  In Tower a credential of the type "Kafka IaC" per environment injects the same variables
+  (`tower/credential-type-kafka-iac.yml`, [Running from Tower](#running-from-tower)).
 - **Every secret is registered** in `iac_required_secrets` (`shared/base/10-security.yml`; the prod tier adds
   `vault_confluent_license`, `dr` adds `vault_password_encoder_secret`). Preflight refuses to deploy while a
-  registered secret is missing or still `CHANGE_ME`.
-- **No password stays in a generated file.** `playbooks/file_secrets.yml`, imported by `site.yml`, moves every
-  password-like value cp-ansible would write into `server.properties` and its siblings into one file per
-  component on the host — owned by the service user, mode `0400` — and makes the roles template
-  `${file:/var/ssl/private/iac-secrets/<component>.properties:<key>}` references instead. Kafka's
-  FileConfigProvider resolves them at startup and may only read files below `iac_file_secrets_dir`
-  (`config.providers.file.param.allowed.paths`). The selected keys are the ones Confluent Secret Protection
-  encrypts, so the coverage is the same without a master key on the hosts (`docs/UPSTREAM-NOTES.md`). Nothing
-  has to be prepared per environment: the values come from vault during the normal run.
-- **Rotating a secret**: change the value in `90-vault.yml`, run `site` (rewrites the file, restarts nothing),
-  then `restart` for the affected component — a running service reads its secret file only at startup.
-- **Control node secret files.** cp-ansible reads these files on the control node and copies them to the
-  hosts. Provide them in `$IAC_SECRETS_DIR` (default `.secrets/<environment>`, git-ignored):
-  `kafka-<inventory_hostname>.keytab` for every controller and broker. Preflight checks that they exist.
-- **Host TLS certificates are expected on the hosts** (`ssl_custom_certs_remote_src: true`, paths under
-  `/var/ssl/private/`). The identity provider CA certificate (`iac_control_node_ca_cert`) is read from the
-  control node.
+  registered secret is empty and names the missing `IAC_SECRET_*` variable. Static validation and rendering
+  need no secret at all: registered secrets are replaced with placeholders.
+- **No password stays in a generated file.** `playbooks/config_secrets.yml`, imported by `site.yml`, takes every
+  password-like value cp-ansible would write into `server.properties` and its siblings out of the file:
+  - service configuration: `${env:CP_SECRET_<KEY>}`, resolved by Kafka's `EnvVarConfigProvider`
+    (`allowlist.pattern ^CP_SECRET_.*`). Each service gets a systemd `EnvironmentFile`
+    `/var/ssl/private/iac-secrets/<component>.env` (root, `0600`); `systemctl show` lists only its path.
+  - `client.properties` of brokers and controllers (kafka-* CLI tools, cp-ansible health checks, which do not run
+    with the service environment): `${file:/var/ssl/private/iac-secrets/<component>_client.properties:<key>}`
+    (service account, `0400`).
+
+  The selected keys are the ones Confluent Secret Protection encrypts, so the coverage is the same without a
+  master key (`docs/UPSTREAM-NOTES.md`). `iac_config_secrets_provider: file` switches the services to
+  FileConfigProvider as well.
+- **Rotating a secret**: change the value in the secret store, run `site --skip-tags package -e skip_restarts=true`
+  (rewrites the files, restarts nothing), then `restart` for the affected component — a service reads its
+  secrets only at startup.
+- **Brokers and controllers** authenticate with SASL_SSL: SCRAM-SHA-512 between brokers and from brokers to the
+  KRaft controllers, PLAIN between the controllers (SCRAM is not possible there). Their two passwords
+  (`IAC_SECRET_KAFKA_BROKER_SCRAM_PASSWORD`, `IAC_SECRET_KAFKA_CONTROLLER_PLAIN_PASSWORD`) must consist of letters
+  and digits; preflight checks it. Changing one of them needs a rolling procedure of its own.
+- **Control node secret files.** Files cp-ansible would read on the control node go into `$IAC_SECRETS_DIR`
+  (default `.secrets/<environment>`, git-ignored). None is needed at the moment.
+- **Host TLS certificates are expected on the hosts** (`ssl_custom_certs_remote_src: true`,
+  `/var/ssl/private/`: `ca-bundle.crt`, `<inventory_hostname>.crt`, `<inventory_hostname>.key`).
+  The identity provider CA certificate (`iac_control_node_ca_cert`) is read from the control node.
+
+### Small non-production environments (three hosts)
+
+`iac_kraft_colocated: true` in `20-components.yml` runs a KRaft controller and a broker on the same host.
+`node_id` then stays unset in `hosts.yml` (controllers become 9991 + host index, brokers 1 + host index, the
+quorum voters follow). Preflight refuses the mode for the prod tier and protected environments. If Control
+Center shares a host with a controller, move Alertmanager off the controller port:
+`control_center_next_gen_dependency_alertmanager_port: 9195`.
+
+## Running from Tower
+
+Tower (AAP automation controller, AWX) runs the playbooks of `playbooks/` directly; nothing in `scripts/` runs on
+the controller. The layers, the symlinks and the overrides are used unchanged: the controller copies the project with
+its symlinks and loads `environments/<environment>` with the `ansible.cfg` of the project. What the scripts do on a
+command line control node comes from controller objects:
+
+| Command line | Tower |
+|---|---|
+| `scripts/bootstrap.sh`: ansible-core 2.18, bcrypt, pinned collections | Execution environment built from `execution-environment.yml`; the project sync installs `collections/requirements.yml` |
+| `scripts/run.sh <environment> <playbook>` | Job template: inventory `<environment>`, playbook `playbooks/<playbook>.yml`; every changing playbook imports `preflight.yml` |
+| `IAC_SECRET_*` from `~/.secrets/<environment>.env` | Credential of the type "Kafka IaC" (`tower/credential-type-kafka-iac.yml`), one per environment |
+| SSH key and sudo of the automation account | Machine credential: user, private key, privilege escalation method `sudo` (and its password unless sudo is passwordless) |
+| `CONFIRM_ENV=<environment>` | Survey question `confirm_env` on the job templates of protected environments |
+| `PLAYBOOK_TAGS`, `PLAYBOOK_LIMIT`, further `-e` | Job tags, skip tags, limit and extra variables of the job template (or prompted on launch) |
+| `AUTO_SUPPORT_BUNDLE` | Off (`support_bundle_auto_collect_on_failure: false`): the bundle would stay in the job's container |
+| `SSH_KNOWN_HOSTS` | Controller setting `ANSIBLE_HOST_KEY_CHECKING` (controller default: `False`) |
+
+**Controller objects**
+
+1. **Execution environment** `kafka-iac`, built from `execution-environment.yml` (`ansible-builder build`): ansible-core
+   2.18 (the default images of AAP 2.5 and 2.6 carry 2.16, community.general 12 needs 2.18), bcrypt, the pinned
+   collections and `ANSIBLE_CONFIG=/runner/project/ansible.cfg` (Ansible ignores `./ansible.cfg` in a world writable
+   working directory, and with it `hash_behaviour = merge`).
+2. **Project**: this repository, branch `main`, execution environment `kafka-iac`, option "Update revision on launch".
+   The organization of the project needs a **Galaxy credential**: without one the project sync skips
+   `collections/requirements.yml` (it never contacts the Galaxy server, the entries are URLs).
+3. **Credential type** "Kafka IaC" from `tower/credential-type-kafka-iac.yml` and one credential per environment.
+   The controller does not accept `ANSIBLE_*` variables in credentials; the execution environment sets `ANSIBLE_CONFIG`.
+4. **Machine credential**: the automation account, its SSH private key, privilege escalation method `sudo`
+   (`ansible_become: true` in `shared/base/00-platform.yml` makes every task escalate on the managed hosts).
+5. **Inventory** per environment with one source "Sourced from a Project": project above, inventory file
+   `environments/<environment>` or `environments/<environment>/hosts.yml` (same result: the `group_vars` next to
+   it are read), execution environment `kafka-iac`, options "Overwrite", "Overwrite variables" and "Update on
+   launch". The sync stores the merged layers; preflight checks that the dictionaries were merged key by key.
+6. **Job templates** per environment, each with the inventory, both credentials and the execution environment above,
+   privilege escalation off:
+
+| Job template | Playbook | Settings |
+|---|---|---|
+| `<environment> - site` | `playbooks/site.yml` | installation and reconfiguration; prompt on launch: tags, limit |
+| `<environment> - write configuration` | `playbooks/site.yml` | skip tags `package`, extra variables `skip_restarts: true` |
+| `<environment> - restart` | `playbooks/restart.yml` | rolling restart; prompt on launch: tags, limit |
+| `<environment> - health check` | `playbooks/health_check.yml` | read-only, no confirmation |
+| `<environment> - validate hosts` | `playbooks/validate_hosts.yml` | read-only, before the first installation |
+| `<environment> - config secrets` | `playbooks/config_secrets.yml` | secret files only, restarts nothing |
+
+Protected environments (`iac_protected_envs`: `preprod`, `production`, `dr`) get a survey on `site`, `restart` and
+`config secrets`: one required text question with the answer variable `confirm_env`. Preflight refuses the run unless
+the answer equals the environment name.
+
+`playbooks/support_bundle.yml` and `playbooks/render_config.yml` write their results on the control node, which in
+Tower is the job's container: run them from a command line control node.
 
 ## Day-to-day operations
 
-All runs go through `scripts/run.sh <environment> <playbook> [ansible-playbook arguments]`.
+On a command line control node all runs go through `scripts/run.sh <environment> <playbook> [ansible-playbook
+arguments]`; Tower runs the same playbooks from job templates ([Running from Tower](#running-from-tower)).
 
 ```bash
 scripts/run.sh dev100 site                                   # deploy or reconfigure an environment
 scripts/run.sh dev100 site --tags kafka_broker               # one component
-scripts/run.sh qa file_secrets                               # only the secret files of the hosts
+scripts/run.sh qa config_secrets                             # only the secret files of the hosts
 scripts/run.sh qa health_check                               # read-only checks
 scripts/run.sh dr support_bundle                             # diagnostics archive
 CONFIRM_ENV=production scripts/run.sh production restart --limit site_dc2   # protected environment, one site
-ANSIBLE_VAULT_IDENTITY_LIST=preprod@prompt CONFIRM_ENV=preprod scripts/run.sh preprod site --tags kafka_connect
+CONFIRM_ENV=preprod scripts/run.sh preprod site --tags kafka_connect   # IAC_SECRET_* of preprod exported
 ```
 
-`run.sh` accepts secrets and options through environment variables (`ANSIBLE_VAULT_PASSWORD`,
+`run.sh` accepts secrets and options through environment variables (`IAC_SECRET_*`,
 `ANSIBLE_SSH_PRIVATE_KEY`, `SSH_KNOWN_HOSTS`, `CONFIRM_ENV`, `PLAYBOOK_TAGS`, `PLAYBOOK_LIMIT`,
 `IAC_SECRETS_DIR`, `IAC_SUPPORT_BUNDLE_DIR`, `AUTO_SUPPORT_BUNDLE`). Secrets are exported instead of being
 passed as CLI flags because the support bundle callback starts a new `ansible-playbook` process that only
 inherits the environment. When a run fails, that callback collects a support bundle automatically; disable it
 with `AUTO_SUPPORT_BUNDLE=false`. `run.sh` executes the guard rails first in a separate process without that
 callback, so a refused run never starts collecting diagnostics from the hosts.
+
+On the hosts every component is a system unit that runs as its service account:
+
+```bash
+sudo systemctl status 'confluent-*'            # confluent-kcontroller, confluent-server, confluent-schema-registry, ...
+sudo journalctl -u confluent-server            # plus the log files below /var/log/kafka/<component>
+```
 
 `deployment_strategy: rolling` provisions running hosts one at a time through the upstream playbooks.
 Upstream warns that rolling can fail while security modes are being changed; use
@@ -316,13 +376,13 @@ scripts/config-diff.sh origin/main production dr    # limited to some environmen
 ```
 
 Rendering evaluates exactly the variables cp-ansible uses to template `server.properties` and the systemd
-overrides, without connecting to any host and without a vault password. Secret-looking keys are masked.
+overrides, without connecting to any host and without any secret. Secret-looking keys are masked.
 
 ### Add an environment
 
 ```bash
 scripts/new-env.sh perf nonprod single-site perf.internal.net
-# edit environments/perf/hosts.yml and 10-env.yml, create 90-vault.yml, add 'perf' to the CI environment lists
+# edit environments/perf/hosts.yml and 10-env.yml, provide the IAC_SECRET_* variables, add 'perf' to the CI lists
 ```
 
 ## Where does a change go?
@@ -336,9 +396,10 @@ scripts/new-env.sh perf nonprod single-site perf.internal.net
 | Heap of a component | `iac_<component>_heap` (base → tier → environment) |
 | A value for one data center | `environments/<env>/group_vars/site_<code>.yml` |
 | A value for one server | `environments/<env>/host_vars/<host>.yml` |
-| A new secret | `vault_<name>` in every affected `90-vault.yml` + entry in `iac_required_secrets` |
+| A new secret | `vault_<name>` in `shared/base/15-secrets.yml` (env lookup) + entry in `iac_required_secrets` + `secrets.env.example` |
 | Corporate CA rotation | new files on the hosts (`/var/ssl/private/`) and on the runners (`iac_control_node_ca_cert`), then `site` |
 | Package, Java or collection versions | `shared/base/00-platform.yml`, `collections/requirements.yml` |
+| Deploy user, installation, data or log directory | `shared/base/00-platform.yml` (and the host bootstrap) |
 
 ## Guard rails
 
@@ -346,19 +407,26 @@ scripts/new-env.sh perf nonprod single-site perf.internal.net
 
 - `hash_behaviour` is `merge` and the installed collection equals `iac_cp_ansible_version`;
 - protected environments (`preprod`, `production`, `dr`) require `-e confirm_env=<environment>`;
-- every host belongs to `env_<environment>`, the inventory directory matches `iac_env`, all layers are loaded;
+- every host belongs to `env_<environment>` (the group of `hosts.yml` matches `iac_env`), all layers are loaded and merged key by key;
 - KRaft: odd number (≥ 3) of dedicated controllers, pinned and unique `node_id`, enough brokers for the
-  internal replication factor;
+  internal replication factor (with `iac_kraft_colocated`: co-location allowed, `node_id` unset, non-production only);
 - topology: stretched hosts belong to exactly one site, both sites host controllers, `broker.rack` matches
   the site; single-site environments have no site groups;
-- deploy mode: registered secrets are set, the MDS super user password is not the upstream default, the
-  keytabs exist, secret masking is on in protected environments.
+- only with `rootless_enabled` (not used): archive installation, deploy user and path set, cp-ansible >= 8.3.2,
+  every host connects as the deploy user without `become`;
+- deploy mode: registered secrets are set, the MDS super user password is not the upstream default, the SCRAM
+  and PLAIN passwords are letters and digits, secret masking is on in protected environments.
+
+`playbooks/validate_hosts.yml` (connects to the hosts, read-only) runs the host checks of cp-ansible: OS version,
+`/tmp`, disk and memory. With `rootless_enabled` it additionally checks the host bootstrap of that mode.
 
 `scripts/validate.sh` adds linting, the variable-name check, syntax checks and rendering for every environment.
 
 ## CI/CD
 
 The pipelines are thin wrappers around `scripts/`, so GitHub Actions and Bitbucket Pipelines behave the same.
+Where environments are operated from Tower, only the validation jobs are used (they need no host and no secret); the
+deploy jobs are the command line alternative to the job templates.
 Both expect **self-hosted Linux runners inside the corporate network** (Nexus and host access) labelled
 `kafka-iac`. On an air-gapped GitHub Enterprise Server, make sure `actions/checkout` and
 `actions/upload-artifact` are available.
@@ -369,10 +437,10 @@ Both expect **self-hosted Linux runners inside the corporate network** (Nexus an
 | Push to main | `validate.yml` | `branches.main` |
 | Operation on an environment | `deploy.yml` (manual, environment/operation/confirmation/tags/limit inputs) | `custom.<environment>` (manual, same inputs as variables) |
 | Approvals | GitHub Environments: required reviewers, main only | Deployment environments: deployment permissions, main only |
-| Secrets | Environment secrets `ANSIBLE_VAULT_PASSWORD`, `ANSIBLE_SSH_PRIVATE_KEY`; variable `SSH_KNOWN_HOSTS` | Deployment variables with the same names |
+| Secrets | Environment secrets `IAC_SECRET_*` (`secrets.env.example`), `ANSIBLE_SSH_PRIVATE_KEY`; variable `SSH_KNOWN_HOSTS` | Deployment variables with the same names |
 | Concurrency | one run per environment (`concurrency` group) | deployment concurrency control of deployment environments |
 
-Fetching the keytabs from the secret store is left as a marked step in both pipelines
+Control node secret files (none at the moment) would be fetched in a marked step of both pipelines
 (OD-04). `.github/CODEOWNERS` requires platform leads for `preprod`, `production`, `dr` and architects for
 `shared/`.
 
@@ -383,4 +451,6 @@ Fetching the keytabs from the secret store is left as a marked step in both pipe
    (`shared/base/00-platform.yml`); preflight fails if they differ.
 3. Read the pull request's effective configuration diff: it shows, per host, every property the new
    collection version changes in every environment.
-4. Roll out environment by environment: `dev100` → `dev` → `test` → `qa` → `preprod` → `production` / `dr`.
+4. Tower: sync the project and rebuild the execution environment image (`execution-environment.yml` bakes the
+   collections of `collections/requirements.yml`).
+5. Roll out environment by environment: `dev100` → `dev` → `test` → `qa` → `preprod` → `production` / `dr`.
