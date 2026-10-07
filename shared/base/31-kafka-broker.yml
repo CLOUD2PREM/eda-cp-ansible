@@ -24,8 +24,8 @@ kafka_broker_custom_properties:
   #   broker <-> broker      SASL_SSL + SCRAM-SHA-512   BROKER listener :9091
   #   broker -> controller   SASL_SSL + SCRAM-SHA-512   CONTROLLER listener :9093. Not the cp-ansible default: that
   #                          would be the first value of kafka_controller_sasl_protocol (PLAIN, 10-security.yml).
-  sasl.mechanism.inter.broker.protocol: SCRAM-SHA-512
-  sasl.mechanism.controller.protocol: SCRAM-SHA-512
+  sasl.mechanism.inter.broker.protocol: PLAIN
+  sasl.mechanism.controller.protocol: PLAIN
   # Confluent Server license. Registered as a required secret for the prod tier; empty elsewhere (trial mode).
   confluent.license: "{{ vault_confluent_license | default('') }}"
   config.providers: env
@@ -71,7 +71,7 @@ kafka_broker_custom_listeners:
     ssl_mutual_auth_enabled: false
     ssl_client_authentication: none
     principal_mapping_rules: [DEFAULT]
-    sasl_protocol: scram
+    sasl_protocol: plain
 
 # Kernel tuning of the broker hosts. cp-ansible applies these values itself (sysctl, as root).
 kafka_broker_sysctl:

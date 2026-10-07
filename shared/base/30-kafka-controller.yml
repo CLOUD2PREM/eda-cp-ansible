@@ -12,7 +12,7 @@ kafka_controller_custom_properties:
   #   controller <-> controller   PLAIN          (SCRAM is impossible between KRaft controllers, 10-security.yml)
   #   inter-broker settings        SCRAM-SHA-512  (the controllers also carry the BROKER listener settings)
   sasl.mechanism.controller.protocol: PLAIN
-  sasl.mechanism.inter.broker.protocol: SCRAM-SHA-512
+  sasl.mechanism.inter.broker.protocol: PLAIN
   config.providers: env
   config.providers.env.class: org.apache.kafka.common.config.provider.EnvVarConfigProvider
   config.providers.env.param.allowlist.pattern: '^IAC_SECRET_.*'
@@ -44,7 +44,7 @@ kafka_controller_listeners:
     ssl_mutual_auth_enabled: false
     ssl_client_authentication: none
     principal_mapping_rules: [DEFAULT]
-    sasl_protocol: plain,scram
+    sasl_protocol: plain
 
 # node_id is pinned per host in hosts.yml. The upstream default of kafka_controller_quorum_voters is
 # computed from the host ORDER (index + 9991), not from node_id, so it is derived from node_id here.
