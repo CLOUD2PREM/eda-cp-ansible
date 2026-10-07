@@ -81,6 +81,7 @@ iac_protected_envs: [preprod, production, dr]
 # Never print secrets in logs or diffs (cp-ansible defaults, pinned so nobody disables them silently).
 mask_sensitive_logs: true
 mask_sensitive_diff: true
+mask_secrets: false
 
 # ---- Support bundle ----------------------------------------------------------
 # The confluent.platform.support_bundle_on_failure callback (ansible.cfg) re-runs playbooks/support_bundle.yml
