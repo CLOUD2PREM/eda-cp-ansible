@@ -95,8 +95,8 @@ ssl_key_filepath: "{{ iac_host_certs_dir }}/{{ inventory_hostname }}.key"
 # The FIRST value of kafka_controller_sasl_protocol is what controllers AND brokers use towards the controllers;
 # sasl.mechanism.controller.protocol in shared/base/31-kafka-broker.yml keeps the brokers on SCRAM-SHA-512, so
 # PLAIN is only used between the controllers.
-sasl_protocol: scram
-kafka_controller_sasl_protocol: plain,scram
+sasl_protocol: plain
+kafka_controller_sasl_protocol: plain
 # SCRAM users live in the KRaft metadata: cp-ansible adds admin when it formats the controllers' storage
 # (kafka-storage format --add-scram) and creates all of them with kafka-configs after the first start.
 # PLAIN users live in the JAAS configuration of the CONTROLLER listener (user_<principal>="<password>").
