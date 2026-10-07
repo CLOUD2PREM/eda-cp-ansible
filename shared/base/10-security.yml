@@ -111,10 +111,10 @@ kafka_controller_sasl_protocol: plain,scram
 sasl_scram_users:
   admin:
     principal: kafka
-    password: "${env:IAC_SECRET_KAFKA_CONTROLLER_PLAIN_PASSWORD}"
+    password: "{{ lookup('ansible.builtin.env', 'IAC_SECRET_KAFKA_CONTROLLER_PLAIN_PASSWORD') }}"
   client:
     principal: client
-    password: "${env:IAC_SECRET_KAFKA_CONTROLLER_PLAIN_PASSWORD}"
+    password: "{{ lookup('ansible.builtin.env', 'IAC_SECRET_KAFKA_CONTROLLER_PLAIN_PASSWORD') }}"
   schema_registry:
     principal: schema_registry
     password: "${env:IAC_SECRET_KAFKA_CONTROLLER_PLAIN_PASSWORD}"
