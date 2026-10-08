@@ -296,7 +296,7 @@
       register: secrets_file
     - name: debug
       ansible.builtin.debug:
-        var: {{ secrets_file }}
+        msg: "{{ (secrets_file.content | b64decode).splitlines() }}"
     - name: Append export lines to .bash_profile only if missing
       ansible.builtin.lineinfile:
         path: "/home/cloud_user/.bash_profile"
