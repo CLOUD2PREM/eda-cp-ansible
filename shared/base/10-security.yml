@@ -182,7 +182,9 @@ schema_registry_ldap_password: "{{ ansible_env.IAC_SECRET_SCHEMA_REGISTRY_LDAP_P
 
 
 # Additional RBAC system admins (e.g. the platform operations team).
-rbac_component_additional_system_admins: []    # TODO: operations principals
+rbac_component_additional_system_admins:
+  - svc-kafka-controlcenter      # TODO: operations principals
+
 
 # MDS -> Active Directory over LDAPS. Group membership is read from the user's memberOf attribute.
 # A dictionary: environments override single keys only (see environments/dev100 for an OpenLDAP variant).

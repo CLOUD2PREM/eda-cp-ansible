@@ -16,5 +16,8 @@ control_center_next_gen_custom_properties:
 control_center_next_gen_data_dir: "{{ iac_data_dir }}/control-center"
 
 
+
+  
+
 control_center_next_gen_service_overrides:
   EnvironmentFile: /opt/confluent/kafka.env
