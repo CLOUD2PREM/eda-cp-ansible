@@ -294,8 +294,9 @@
       ansible.builtin.slurp:
         src: /opt/confluent/kafka.env
       register: secrets_file
-      no_log: true
-
+    - name: debug
+      ansible.builtin.debug:
+        var: {{ secrets_file }}
     - name: Append export lines to .bash_profile only if missing
       ansible.builtin.lineinfile:
         path: "/home/cloud_user/.bash_profile"
@@ -308,4 +309,3 @@
       when:
         - item | trim != ''
         - not item.strip().startswith('#')
-      no_log: true
