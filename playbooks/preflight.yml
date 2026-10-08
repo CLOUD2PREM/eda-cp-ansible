@@ -298,12 +298,13 @@
 
     - name: Append export lines to .bash_profile only if missing
       ansible.builtin.lineinfile:
-        path: "{{ ansible_user_dir }}/.bash_profile"
+        path: "/home/cloud_user/.bash_profile"
+        regexp: "^export {{ item.split('=')[0] }}="
         line: "export {{ item }}"
-        owner: "{{ ansible_user }}"
-        group: "{{ ansible_user }}"
+        owner: "cloud-user"
+        group: "cloud-user"
         mode: '0644'
-      loop: "{{ secrets_file.content.splitlines() }}"
+      loop: "{{ (secrets_file.content | b64decode).splitlines()}}"
       when:
         - item | trim != ''
         - not item.strip().startswith('#')
