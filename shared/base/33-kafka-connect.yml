@@ -20,3 +20,7 @@ kafka_connect_custom_properties:
   key.converter.schema.registry.basic.auth.user.info: "{{ kafka_connect_ldap_user }}:${env:IAC_SECRET_KAFKA_CONNECT_LDAP_PASSWORD}"
   value.converter.schema.registry.basic.auth.user.info: "{{ kafka_connect_ldap_user }}:${env:IAC_SECRET_KAFKA_CONNECT_LDAP_PASSWORD}"
   
+
+
+kafka_connect_service_overrides:
+  EnvironmentFile: /opt/confluent/kafka.env

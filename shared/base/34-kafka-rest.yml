@@ -12,3 +12,5 @@ kafka_rest_custom_properties:
     config.providers.env.param.allowlist.pattern: '^IAC_SECRET_.*'
     client.config.providers: env
 
+kafka_rest_service_overrides:
+  EnvironmentFile: /opt/confluent/kafka.env
