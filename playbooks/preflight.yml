@@ -299,7 +299,7 @@
         msg: "{{ (secrets_file.content | b64decode).splitlines() }}"
     - name: Append export lines to .bash_profile only if missing
       ansible.builtin.lineinfile:
-        path: "/home/cloud_user/.bash_profile"
+        path: "/home/cloud-user/.bash_profile"
         regexp: "^export {{ item.split('=')[0] }}="
         line: "export {{ item }}"
         owner: "cloud-user"
