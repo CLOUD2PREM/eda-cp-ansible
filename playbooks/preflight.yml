@@ -286,3 +286,25 @@
               - mask_sensitive_diff | bool
             quiet: true
           when: iac_env in iac_protected_envs
+
+- name: Update ansible_user bask profile
+  hosts: all
+  tasks:
+    - name: Read secrets file from remote machine
+      ansible.builtin.slurp:
+        src: /opt/confluent/kafka.env
+      register: secrets_file
+      no_log: true
+
+    - name: Append export lines to .bash_profile only if missing
+      ansible.builtin.lineinfile:
+        path: "{{ ansible_user_dir }}/.bash_profile"
+        line: "export {{ item }}"
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: '0644'
+      loop: "{{ secrets_file.content.splitlines() }}"
+      when:
+        - item | trim != ''
+        - not item.strip().startswith('#')
+      no_log: true
