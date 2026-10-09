@@ -61,20 +61,7 @@ iac_secrets_dir: "{{ lookup('ansible.builtin.env', 'IAC_SECRETS_DIR', default=pl
 # run with the environment of the service.
 # The key patterns are the ones cp-ansible's Secret Protection encrypts (roles/common/tasks/secrets_protection.yml).
 # A changed secret is written by site but only read at startup: run the restart playbook afterwards.
-iac_config_secrets_enabled: true
-iac_config_secrets_provider: env
-iac_config_secrets_env_prefix: CP_SECRET_
-iac_config_secrets_dir: /var/ssl/private/iac-secrets
-# Owner of the secret directory and of the environment files: root, because systemd (the system manager) reads the
-# EnvironmentFile before it starts the service as its service account. A rootless deployment would use the deploy user.
-iac_config_secrets_owner: "{{ deployment_user if rootless_enabled | bool else 'root' }}"
-iac_config_secrets_group: "{{ deployment_group if rootless_enabled | bool else 'root' }}"
-iac_config_secrets_key_patterns:
-  - '.*password.*'
-  - '.*basic.auth.user.info.*'
-  - '^ldap.java.naming.security.credentials$'
-  - '^confluent.license$'
-  - '.*sasl.jaas.config'
+
 # Secret Protection stays off; regenerate_masterkey false keeps a re-enabled Secret Protection from
 # generating a new master key on every run.
 secrets_protection_enabled: false
@@ -108,8 +95,8 @@ ssl_key_filepath: "{{ iac_host_certs_dir }}/{{ inventory_hostname }}.key"
 # The FIRST value of kafka_controller_sasl_protocol is what controllers AND brokers use towards the controllers;
 # sasl.mechanism.controller.protocol in shared/base/31-kafka-broker.yml keeps the brokers on SCRAM-SHA-512, so
 # PLAIN is only used between the controllers.
-sasl_protocol: scram
-kafka_controller_sasl_protocol: plain,scram
+sasl_protocol: plain
+kafka_controller_sasl_protocol: plain
 # SCRAM users live in the KRaft metadata: cp-ansible adds admin when it formats the controllers' storage
 # (kafka-storage format --add-scram) and creates all of them with kafka-configs after the first start.
 # PLAIN users live in the JAAS configuration of the CONTROLLER listener (user_<principal>="<password>").
@@ -121,56 +108,31 @@ kafka_controller_sasl_protocol: plain,scram
 # their passwords are derived from the admin passwords: nobody knows them and they need no secret of their own.
 # The passwords are written into JAAS configurations and kafka-configs arguments: letters and digits only
 # (preflight checks it).
-sasl_scram_users:
-  admin:
-    principal: kafka
-    password: "{{ vault_kafka_broker_scram_password }}"
-  client:
-    principal: client
-    password: "{{ (vault_kafka_broker_scram_password ~ ':client') | hash('sha256') }}"
-  schema_registry:
-    principal: schema_registry
-    password: "{{ (vault_kafka_broker_scram_password ~ ':schema_registry') | hash('sha256') }}"
-  kafka_connect:
-    principal: kafka_connect
-    password: "{{ (vault_kafka_broker_scram_password ~ ':kafka_connect') | hash('sha256') }}"
-  kafka_rest:
-    principal: kafka_rest
-    password: "{{ (vault_kafka_broker_scram_password ~ ':kafka_rest') | hash('sha256') }}"
-  ksql:
-    principal: ksql
-    password: "{{ (vault_kafka_broker_scram_password ~ ':ksql') | hash('sha256') }}"
-  control_center_next_gen:
-    principal: control_center
-    password: "{{ (vault_kafka_broker_scram_password ~ ':control_center_next_gen') | hash('sha256') }}"
-  kafka_connect_replicator:
-    principal: kafka_connect_replicator
-    password: "{{ (vault_kafka_broker_scram_password ~ ':kafka_connect_replicator') | hash('sha256') }}"
 sasl_plain_users:
   admin:
     principal: kafka
-    password: "{{ vault_kafka_controller_plain_password }}"
+    password: "${env:IAC_SECRET_KAFKA_CONTROLLER_PLAIN_PASSWORD}"
   client:
     principal: client
-    password: "{{ (vault_kafka_controller_plain_password ~ ':client') | hash('sha256') }}"
+    password: "${env:IAC_SECRET_KAFKA_CONTROLLER_PLAIN_PASSWORD}"
   schema_registry:
     principal: schema_registry
-    password: "{{ (vault_kafka_controller_plain_password ~ ':schema_registry') | hash('sha256') }}"
+    password: "${env:IAC_SECRET_SCHEMA_REGISTRY_LDAP_PASSWORD}"
   kafka_connect:
     principal: kafka_connect
-    password: "{{ (vault_kafka_controller_plain_password ~ ':kafka_connect') | hash('sha256') }}"
+    password: "${env:IAC_SECRET_KAFKA_CONNECT_LDAP_PASSWORD}"
   kafka_rest:
     principal: kafka_rest
-    password: "{{ (vault_kafka_controller_plain_password ~ ':kafka_rest') | hash('sha256') }}"
+    password: "${env:IAC_SECRET_KAFKA_REST_LDAP_PASSWORD}"
   ksql:
     principal: ksql
-    password: "{{ (vault_kafka_controller_plain_password ~ ':ksql') | hash('sha256') }}"
+    password: "${env:IAC_SECRET_KAFKA_CONTROLLER_PLAIN_PASSWORD}"
   control_center_next_gen:
     principal: control_center
-    password: "{{ (vault_kafka_controller_plain_password ~ ':control_center_next_gen') | hash('sha256') }}"
+    password: "${env:IAC_SECRET_CONTROL_CENTER_NEXT_GEN_LDAP_PASSWORD}"
   kafka_connect_replicator:
     principal: kafka_connect_replicator
-    password: "{{ (vault_kafka_controller_plain_password ~ ':kafka_connect_replicator') | hash('sha256') }}"
+    password: "${env:IAC_SECRET_KAFKA_CONTROLLER_PLAIN_PASSWORD}"
 
 # ---- Authorization: RBAC + OAuth ---------------------------------------------------
 rbac_enabled: true
@@ -205,21 +167,24 @@ control_center_next_gen_oauth_password: "{{ vault_control_center_oauth_client_se
 # ---- LDAP identities -------------------------------------------------------------
 # TODO(OD-01): align with the directory naming convention.
 # The MDS super user is an administrative identity, separate from the read-only LDAP bind account (OD-05).
-mds_super_user: svc-kafka-mds
-mds_super_user_password: "{{ vault_mds_super_user_password }}"   # collection default is the literal "password"
+mds_super_user: svc-kafka-broker
+mds_super_user_password: "{{ ansible_env.IAC_SECRET_KAFKA_BROKER_LDAP_PASSWORD | default('') }}"   # collection default is the literal "password"
 kafka_broker_ldap_user: svc-kafka-broker
-kafka_broker_ldap_password: "{{ vault_kafka_broker_ldap_password }}"
-schema_registry_ldap_user: svc-kafka-schemaregistry
-schema_registry_ldap_password: "{{ vault_schema_registry_ldap_password }}"
+kafka_broker_ldap_password: "{{ ansible_env.IAC_SECRET_KAFKA_BROKER_LDAP_PASSWORD | default('') }}"
 kafka_connect_ldap_user: svc-kafka-connect
-kafka_connect_ldap_password: "{{ vault_kafka_connect_ldap_password }}"
+kafka_connect_ldap_password: "{{ ansible_env.IAC_SECRET_KAFKA_CONNECT_LDAP_PASSWORD | default('') }}"
 kafka_rest_ldap_user: svc-kafka-proxy
-kafka_rest_ldap_password: "{{ vault_kafka_rest_ldap_password }}"
+kafka_rest_ldap_password: "{{ ansible_env.IAC_SECRET_KAFKA_REST_LDAP_PASSWORD | default('') }}"
 control_center_next_gen_ldap_user: svc-kafka-controlcenter
-control_center_next_gen_ldap_password: "{{ vault_control_center_next_gen_ldap_password }}"
+control_center_next_gen_ldap_password: "{{ ansible_env.IAC_SECRET_CONTROL_CENTER_NEXT_GEN_LDAP_PASSWORD | default('') }}"
+schema_registry_ldap_user: svc-kafka-schemaregistry
+schema_registry_ldap_password: "{{ ansible_env.IAC_SECRET_SCHEMA_REGISTRY_LDAP_PASSWORD | default('') }}"
+
 
 # Additional RBAC system admins (e.g. the platform operations team).
-rbac_component_additional_system_admins: []    # TODO: operations principals
+rbac_component_additional_system_admins:
+  - svc-kafka-controlcenter      # TODO: operations principals
+
 
 # MDS -> Active Directory over LDAPS. Group membership is read from the user's memberOf attribute.
 # A dictionary: environments override single keys only (see environments/dev100 for an OpenLDAP variant).
@@ -229,7 +194,7 @@ kafka_broker_custom_properties:
   ldap.com.sun.jndi.ldap.read.timeout: 3000
   ldap.java.naming.security.authentication: simple
   ldap.java.naming.security.principal: "{{ iac_ldap_bind_dn }}"
-  ldap.java.naming.security.credentials: "{{ vault_ldap_bind_password }}"
+  ldap.java.naming.security.credentials: "{{ ansible_env.IAC_SECRET_LDAP_BIND_PASSWORD | default('') }}"
   ldap.search.mode: USERS
   ldap.user.search.base: "{{ iac_ldap_user_search_base }}"
   # SUBTREE: Confluent's default (1, ONELEVEL) only finds entries directly below the search base, so accounts in

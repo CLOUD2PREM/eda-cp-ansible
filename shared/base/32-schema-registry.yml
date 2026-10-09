@@ -7,3 +7,14 @@ schema_registry_service_environment_overrides:
 
 schema_registry_custom_properties:
   schema.compatibility.level: backward      # TODO(OD-10): schema governance decision
+  schema_registry_custom_properties:
+  config.providers: env
+  config.providers.env.class: org.apache.kafka.common.config.provider.EnvVarConfigProvider
+  config.providers.env.param.allowlist.pattern: '^IAC_SECRET_.*'
+  confluent.metadata.basic.auth.user.info: "{{ schema_registry_ldap_user }}:${env:IAC_SECRET_SCHEMA_REGISTRY_LDAP_PASSWORD}"
+
+
+schema_registry_service_overrides:
+  EnvironmentFile: /opt/confluent/kafka.env
+
+

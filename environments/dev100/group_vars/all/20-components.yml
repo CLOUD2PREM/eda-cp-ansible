@@ -23,6 +23,18 @@ kafka_broker_custom_properties:
   ldap.group.member.attribute: member
   ldap.group.member.attribute.pattern: "uid=(.*),ou=users,dc=lab,dc=local"
 
+# ---- LAB: no SSL (THY: shared/base) ----------------------------------------------------------------
+ssl_enabled: false
+ssl_custom_certs: false
+kafka_controller_listeners:
+  controller:
+    ssl_enabled: false
+kafka_broker_custom_listeners:
+  internal:
+    ssl_enabled: false
+  broker:
+    ssl_enabled: false
+
 # ---- LAB: no identity provider, LDAP only (THY: shared/base) ----------------------------------------
 auth_mode: ldap
 iac_required_secrets:              # dictionary merge: false removes an entry of the baseline registry
@@ -39,7 +51,7 @@ kafka_rest_oauth_password: password
 control_center_next_gen_oauth_password: password
 oauth_idp_cert_path: ""
 # LAB: MDS super user of the lab directory (baseline: svc-kafka-mds)
-mds_super_user: mds
+mds_super_user: svc-kafka-broker
 
 # ---- LAB: the file server on cp-node1 instead of Nexus ---------------------------------------------
 iac_artifact_url: http://10.0.0.140:8888
