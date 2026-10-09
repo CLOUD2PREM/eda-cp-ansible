@@ -167,8 +167,8 @@ control_center_next_gen_oauth_password: "{{ vault_control_center_oauth_client_se
 # ---- LDAP identities -------------------------------------------------------------
 # TODO(OD-01): align with the directory naming convention.
 # The MDS super user is an administrative identity, separate from the read-only LDAP bind account (OD-05).
-mds_super_user: svc-kafka-mds
-mds_super_user_password: "{{ ansible_env.IAC_SECRET_MDS_SUPER_USER_PASSWORD | default('') }}"   # collection default is the literal "password"
+mds_super_user: svc-kafka-broker
+mds_super_user_password: "{{ ansible_env.IAC_SECRET_KAFKA_BROKER_LDAP_PASSWORD | default('') }}"   # collection default is the literal "password"
 kafka_broker_ldap_user: svc-kafka-broker
 kafka_broker_ldap_password: "{{ ansible_env.IAC_SECRET_KAFKA_BROKER_LDAP_PASSWORD | default('') }}"
 kafka_connect_ldap_user: svc-kafka-connect

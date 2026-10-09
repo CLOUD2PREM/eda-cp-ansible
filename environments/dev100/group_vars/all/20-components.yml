@@ -51,7 +51,7 @@ kafka_rest_oauth_password: password
 control_center_next_gen_oauth_password: password
 oauth_idp_cert_path: ""
 # LAB: MDS super user of the lab directory (baseline: svc-kafka-mds)
-mds_super_user: mds
+mds_super_user: svc-kafka-broker
 
 # ---- LAB: the file server on cp-node1 instead of Nexus ---------------------------------------------
 iac_artifact_url: http://10.0.0.140:8888
