@@ -195,16 +195,21 @@ kafka_broker_custom_properties:
   ldap.java.naming.security.authentication: simple
   ldap.java.naming.security.principal: "{{ iac_ldap_bind_dn }}"
   ldap.java.naming.security.credentials: "{{ ansible_env.IAC_SECRET_LDAP_BIND_PASSWORD | default('') }}"
-  ldap.search.mode: USERS
+  ldap.search.mode: GROUPS
   ldap.user.search.base: "{{ iac_ldap_user_search_base }}"
   # SUBTREE: Confluent's default (1, ONELEVEL) only finds entries directly below the search base, so accounts in
   # sub-OUs (e.g. uid=svc,ou=serviceaccount,o=corp under base o=corp) are never found and MDS logins fail.
-  ldap.user.search.scope: 2
-  ldap.group.search.scope: 2
-  ldap.user.name.attribute: sAMAccountName
   ldap.user.object.class: user
   ldap.user.memberof.attribute: memberOf
   ldap.user.memberof.attribute.pattern: "CN=([^,]+),.*"
+  # 3. Group Search Configuration (Active Directory Specific)
   ldap.group.search.base: "{{ iac_ldap_group_search_base }}"
+  ldap.group.search.scope: 2
   ldap.group.object.class: group
   ldap.group.name.attribute: cn
+  ldap.group.member.attribute: member
+  ldap.group.member.attribute.pattern: CN=(.*?),OU=Users,DC=example,DC=com
+  # 4. User Lookup Configuration (Required for initial Principal Mapping)
+  ldap.user.search.filter: (sAMAccountName={0})
+  ldap.user.search.scope: 2
+  ldap.user.name.attribute: sAMAccountName

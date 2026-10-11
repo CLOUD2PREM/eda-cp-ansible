@@ -92,4 +92,4 @@ mask_secrets: false
 # does not see this file and stays on (off: AUTO_SUPPORT_BUNDLE=false with scripts/run.sh).
 # IAC_SUPPORT_BUNDLE_DIR lets CI collect the bundle into its workspace.
 support_bundle_auto_collect_on_failure: false
-support_bundle_output_path: "{{ lookup('ansible.builtin.env', 'IAC_SUPPORT_BUNDLE_DIR', default='~/confluent-platform-support-bundles') }}"
+support_bundle_output_path: "{{ lookup('ansible.builtin.env', 'IAC_SUPPORT_BUNDLE_DIR', default= iac_log_dir ~ '/confluent-platform-support-bundles') }}"
