@@ -3,6 +3,8 @@
 # because cp-ansible uses the same node_id host variable for both roles)
 iac_kafka_controller_heap: "-Xms2g -Xmx2g"
 
+
+
 kafka_controller_custom_properties:
   log.dirs: "{{ iac_data_dir }}/controller"
   # Mechanisms of the controllers, written out explicitly. cp-ansible derives the same values from the listeners
@@ -10,12 +12,22 @@ kafka_controller_custom_properties:
   #   controller <-> controller   PLAIN          (SCRAM is impossible between KRaft controllers, 10-security.yml)
   #   inter-broker settings        SCRAM-SHA-512  (the controllers also carry the BROKER listener settings)
   sasl.mechanism.controller.protocol: PLAIN
-  sasl.mechanism.inter.broker.protocol: SCRAM-SHA-512
+  sasl.mechanism.inter.broker.protocol: PLAIN
+  config.providers: env
+  config.providers.env.class: org.apache.kafka.common.config.provider.EnvVarConfigProvider
+  config.providers.env.param.allowlist.pattern: '^IAC_SECRET_.*'
 
+kafka_controller_custom_client_properties:  
+    config.providers: env
+    config.providers.env.class: org.apache.kafka.common.config.provider.EnvVarConfigProvider
+    config.providers.env.param.allowlist.pattern: '^IAC_SECRET_.*'
 # merge semantics: only KAFKA_HEAP_OPTS is replaced; upstream keys (KAFKA_OPTS, LOG_DIR, ...) are kept.
 kafka_controller_service_environment_overrides:
   KAFKA_HEAP_OPTS: "{{ iac_kafka_controller_heap }} {{ iac_jvm_g1_opts }}"
 
+kafka_controller_service_overrides:
+  EnvironmentFile: /opt/confluent/kafka.env
+  
 # ---- Listener of the controllers, written out explicitly -------------------------------------------
 # cp-ansible has no kafka_controller_custom_listeners: this dictionary replaces its default completely.
 # The values equal the collection default of this repository (the rendered configuration does not change);
@@ -32,7 +44,7 @@ kafka_controller_listeners:
     ssl_mutual_auth_enabled: false
     ssl_client_authentication: none
     principal_mapping_rules: [DEFAULT]
-    sasl_protocol: plain,scram
+    sasl_protocol: plain
 
 # node_id is pinned per host in hosts.yml. The upstream default of kafka_controller_quorum_voters is
 # computed from the host ORDER (index + 9991), not from node_id, so it is derived from node_id here.
@@ -48,3 +60,8 @@ kafka_controller_quorum_voters: >-
       else (groups['kafka_controller'] | map('extract', hostvars, 'node_id') | list))
      | zip(groups['kafka_controller']) | map('join', '@')
      | product([':' ~ kafka_controller_port | default(9093)]) | map('join') | join(',') }}
+
+
+
+# ---- KRaft controllers ------------------------------------------------------------------------------
+

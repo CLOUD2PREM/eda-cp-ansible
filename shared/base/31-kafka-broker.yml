@@ -24,10 +24,25 @@ kafka_broker_custom_properties:
   #   broker <-> broker      SASL_SSL + SCRAM-SHA-512   BROKER listener :9091
   #   broker -> controller   SASL_SSL + SCRAM-SHA-512   CONTROLLER listener :9093. Not the cp-ansible default: that
   #                          would be the first value of kafka_controller_sasl_protocol (PLAIN, 10-security.yml).
-  sasl.mechanism.inter.broker.protocol: SCRAM-SHA-512
-  sasl.mechanism.controller.protocol: SCRAM-SHA-512
+  sasl.mechanism.inter.broker.protocol: PLAIN
+  sasl.mechanism.controller.protocol: PLAIN
   # Confluent Server license. Registered as a required secret for the prod tier; empty elsewhere (trial mode).
   confluent.license: "{{ vault_confluent_license | default('') }}"
+  config.providers: env
+  config.providers.env.class: org.apache.kafka.common.config.provider.EnvVarConfigProvider
+  config.providers.env.param.allowlist.pattern: '^IAC_SECRET_.*'
+  ldap.java.naming.security.credentials: "${env:IAC_SECRET_LDAP_BIND_PASSWORD}"
+  confluent.basic.auth.user.info: "{{ schema_registry_ldap_user }}:${env:IAC_SECRET_SCHEMA_REGISTRY_LDAP_PASSWORD}"
+  kafka.rest.confluent.metadata.basic.auth.user.info: "{{ kafka_broker_ldap_user }}:${env:IAC_SECRET_KAFKA_BROKER_LDAP_PASSWORD}"
+
+kafka_broker_custom_client_properties:  
+    config.providers: env
+    config.providers.env.class: org.apache.kafka.common.config.provider.EnvVarConfigProvider
+    config.providers.env.param.allowlist.pattern: '^IAC_SECRET_.*'
+
+
+kafka_broker_service_overrides:
+  EnvironmentFile: /opt/confluent/kafka.env
 
 # ---- Listeners of the brokers, written out explicitly ----------------------------------------------
 # cp-ansible merges kafka_broker_custom_listeners key by key into its default listeners. Both entries repeat the
@@ -56,7 +71,7 @@ kafka_broker_custom_listeners:
     ssl_mutual_auth_enabled: false
     ssl_client_authentication: none
     principal_mapping_rules: [DEFAULT]
-    sasl_protocol: scram
+    sasl_protocol: plain
 
 # Kernel tuning of the broker hosts. cp-ansible applies these values itself (sysctl, as root).
 kafka_broker_sysctl:
@@ -64,3 +79,6 @@ kafka_broker_sysctl:
   vm.dirty_background_ratio: 5
   vm.dirty_ratio: 80
   vm.max_map_count: 262144
+
+
+
