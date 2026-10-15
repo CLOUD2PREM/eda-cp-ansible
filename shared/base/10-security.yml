@@ -138,7 +138,7 @@ kafka_controller_sasl_protocol: kerberos
 
 kerberos_configure: false
 iac_kerberos_realm: DAHBEST.KFN
-iac_keytab_dir: /mnt/sambda/configs/keytabs
+iac_keytab_dir: /mnt
 iac_keytab_stage_dir: /tmp/iac-keytabs
 # Keytabs. *_kerberos_keytab_path is the SOURCE on the ANSIBLE CONTROL NODE (the copy module's
 # src, coll/roles/kerberos/tasks/main.yml:24-31); *_keytab_path is the destination on the host
