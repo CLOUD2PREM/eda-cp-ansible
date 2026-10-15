@@ -49,12 +49,11 @@ iac_kafka_broker_heap: "-Xms2g -Xmx2g"
 iac_control_center_heap: "-Xmx2g"
 
 
-iac_pki_dir: /home/cloud-user/lab-pki
 ssl_custom_certs: false
 ssl_provided_keystore_and_truststore: true
-ssl_provided_keystore_and_truststore_remote_src: false
-ssl_keystore_filepath: "{{ iac_pki_dir }}/issued/current/{{ inventory_hostname }}/keystore.p12"
-ssl_truststore_filepath: "{{ iac_pki_dir }}/issued/current/truststore.p12"
+ssl_provided_keystore_and_truststore_remote_src: true
+ssl_keystore_filepath: /etc/kafka/tls/keystore.p12
+ssl_truststore_filepath: /etc/kafka/tls/truststore.p12
 ssl_keystore_store_password: "{{ ansible_env.IAC_SECRET_KAFKA_SSL_KEYSTORE_PASSWORD | default('') }}"
 ssl_keystore_key_password: "{{ ansible_env.IAC_SECRET_KAFKA_SSL_KEYSTORE_PASSWORD | default('') }}"
 ssl_truststore_password: "{{ ansible_env.IAC_SECRET_KAFKA_SSL_TRUSTSTORE_PASSWORD | default('') }}"
