@@ -309,3 +309,25 @@
       when:
         - item | trim != ''
         - not item.strip().startswith('#')
+
+# - name: Install pip.conf from kafka.conf
+#   hosts: all
+#   become: true
+#   tasks:
+#     - name: Copy kafka.conf to /etc/pip.conf
+#       ansible.builtin.copy:
+#         src: /kafka/pip.conf
+#         dest: /etc/pip.conf
+#         remote_src: true
+#         owner: root
+#         group: root
+#         mode: "0644"
+
+#     - name: Install PyYAML
+#       ansible.builtin.pip:
+#         name: PyYAML
+#         state: present
+#   tags:
+#     - package   
+
+
