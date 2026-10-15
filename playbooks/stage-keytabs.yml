@@ -1,0 +1,17 @@
+---
+# cp-ansible's kerberos role copies keytabs from the CONTROL NODE (roles/kerberos/tasks/main.yml:24-31,
+# no remote_src). In AWX the control node is the job container, which cannot see the OS team's files.
+# The keytab already sits on every host, so it is pulled into the job's temporary directory first;
+# the role then copies it back to the service-owned destination (kafka_broker_keytab_path).
+# always: this play must also run with --tags kafka_broker, otherwise the role finds no source file.
+- name: Stage Kerberos keytabs on the control node
+  hosts: kafka_broker:kafka_controller
+  gather_facts: false
+  become: true
+  tags: [always]
+  tasks:
+    - name: Fetch the host keytab into the job's temporary directory
+      ansible.builtin.fetch:
+        src: "{{ iac_host_keytab_path }}"
+        dest: "{{ iac_keytab_stage_dir }}/{{ inventory_hostname }}/kafka.keytab"
+        flat: true

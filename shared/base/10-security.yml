@@ -139,11 +139,12 @@ kafka_controller_sasl_protocol: kerberos
 kerberos_configure: false
 iac_kerberos_realm: DAHBEST.KFN
 iac_keytab_dir: /mnt/sambda/configs/keytabs
+iac_keytab_stage_dir: /tmp/iac-keytabs
 # Keytabs. *_kerberos_keytab_path is the SOURCE on the ANSIBLE CONTROL NODE (the copy module's
 # src, coll/roles/kerberos/tasks/main.yml:24-31); *_keytab_path is the destination on the host
 # (default /etc/security/keytabs/...). Broker and controller share one keytab per host, because
 # they share one principal. iac_keytab_dir and iac_kerberos_realm are set per environment.
-kafka_broker_kerberos_keytab_path: "{{ iac_keytab_dir }}/{{ inventory_hostname.split('.')[0] }}/kafka.keytab"
+kafka_broker_kerberos_keytab_path: "{{ iac_keytab_stage_dir }}/{{ inventory_hostname }}/kafka.keytab"
 kafka_controller_kerberos_keytab_path: "{{ kafka_broker_kerberos_keytab_path }}"
 kafka_broker_kerberos_principal: "kafka/{{ inventory_hostname }}@{{ iac_kerberos_realm }}"
 kafka_controller_kerberos_principal: "{{ kafka_broker_kerberos_principal }}"
