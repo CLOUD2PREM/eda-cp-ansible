@@ -15,3 +15,23 @@
         src: "{{ iac_host_keytab_path }}"
         dest: "{{ iac_keytab_stage_dir }}/{{ inventory_hostname }}/kafka.keytab"
         flat: true
+
+
+
+# The TLS stores live on the hosts (/etc/kafka/tls). With remote_src false cp-ansible copies them
+# from the control node, so they are pulled into the job's temporary directory first. cp-ansible then
+# copies one per component into /var/ssl/private and sets owner and mode itself.
+- name: Stage TLS stores on the control node
+  hosts: kafka_controller:kafka_broker:schema_registry:kafka_connect:kafka_rest:control_center_next_gen
+  gather_facts: false
+  become: true
+  tags: [always]
+  tasks:
+    - name: Fetch the host keystore and truststore into the job's temporary directory
+      ansible.builtin.fetch:
+        src: "{{ iac_host_tls_dir }}/{{ item }}"
+        dest: "{{ iac_tls_stage_dir }}/{{ inventory_hostname }}/{{ item }}"
+        flat: true
+      loop:
+        - keystore.p12
+        - truststore.p12

@@ -49,13 +49,15 @@ iac_kafka_broker_heap: "-Xms2g -Xmx2g"
 iac_control_center_heap: "-Xmx2g"
 
 
-#ssl_custom_certs: false
-#ssl_provided_keystore_and_truststore: true
-#ssl_provided_keystore_and_truststore_remote_src: true
-#ssl_keystore_filepath: /etc/kafka/tls/keystore.p12
-#ssl_truststore_filepath: /etc/kafka/tls/truststore.p12
-#ssl_keystore_store_password: "{{ ansible_env.IAC_SECRET_KAFKA_SSL_KEYSTORE_PASSWORD | default('') }}"
-#ssl_keystore_key_password: "{{ ansible_env.IAC_SECRET_KAFKA_SSL_KEYSTORE_PASSWORD | default('') }}"
-#ssl_truststore_password: "{{ ansible_env.IAC_SECRET_KAFKA_SSL_TRUSTSTORE_PASSWORD | default('') }}"
-#ssl_keystore_alias: "{{ inventory_hostname }}"
-#ssl_truststore_ca_cert_alias: lab-root-ca
+iac_host_tls_dir: /etc/kafka/tls
+iac_tls_stage_dir: /tmp/iac-tls
+ssl_custom_certs: false
+ssl_provided_keystore_and_truststore: true
+ssl_provided_keystore_and_truststore_remote_src: false
+ssl_keystore_filepath: "{{ iac_tls_stage_dir }}/{{ inventory_hostname }}/keystore.p12"
+ssl_truststore_filepath: "{{ iac_tls_stage_dir }}/{{ inventory_hostname }}/truststore.p12"
+ssl_keystore_store_password: "{{ ansible_env.IAC_SECRET_KAFKA_SSL_KEYSTORE_PASSWORD | default('') }}"
+ssl_keystore_key_password: "{{ ansible_env.IAC_SECRET_KAFKA_SSL_KEYSTORE_PASSWORD | default('') }}"
+ssl_truststore_password: "{{ ansible_env.IAC_SECRET_KAFKA_SSL_TRUSTSTORE_PASSWORD | default('') }}"
+ssl_keystore_alias: "{{ inventory_hostname }}"
+ssl_truststore_ca_cert_alias: lab-root-ca
