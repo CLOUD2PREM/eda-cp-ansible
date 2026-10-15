@@ -55,8 +55,8 @@ ssl_provided_keystore_and_truststore: true
 ssl_provided_keystore_and_truststore_remote_src: false
 ssl_keystore_filepath: "{{ iac_pki_dir }}/issued/current/{{ inventory_hostname }}/keystore.p12"
 ssl_truststore_filepath: "{{ iac_pki_dir }}/issued/current/truststore.p12"
-ssl_keystore_store_password: "{{ vault_ssl_keystore_password }}"
-ssl_keystore_key_password: "{{ vault_ssl_keystore_password }}"
-ssl_truststore_password: "{{ vault_ssl_keystore_password }}"
+ssl_keystore_store_password: "{{ ansible_env.IAC_SECRET_KAFKA_SSL_KEYSTORE_PASSWORD | default('') }}"
+ssl_keystore_key_password: "{{ ansible_env.IAC_SECRET_KAFKA_SSL_KEYSTORE_PASSWORD | default('') }}"
+ssl_truststore_password: "{{ ansible_env.IAC_SECRET_KAFKA_SSL_TRUSTSTORE_PASSWORD | default('') }}"
 ssl_keystore_alias: "{{ inventory_hostname }}"
 ssl_truststore_ca_cert_alias: lab-root-ca
