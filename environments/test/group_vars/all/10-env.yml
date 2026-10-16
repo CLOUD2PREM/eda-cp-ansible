@@ -12,13 +12,13 @@ kafka_connect_cluster_name: cp-test-connect
 kafka_connect_group_id: cp-test-connect
 
 # Directory services (Active Directory, LDAPS)
-iac_ldap_url: ldaps://ad.test.internal.net:636
-iac_ldap_bind_dn: "CN=ldap-bind-user,OU=ServiceAccounts,DC=test,DC=internal,DC=net"
-iac_ldap_user_search_base: "OU=Users,DC=test,DC=internal,DC=net"
-iac_ldap_group_search_base: "OU=Groups,DC=test,DC=internal,DC=net"
+iac_ldap_url: ldap://cp-node1.lab.local:1389
+iac_ldap_bind_dn: "cn=ldap-bind-user,dc=lab,dc=local"
+iac_ldap_user_search_base: "ou=users,dc=lab,dc=local"
+iac_ldap_group_search_base: "ou=groups,dc=lab,dc=local"
 
 # Identity provider (OAuth). Client secrets come from IAC_SECRET_* variables (secrets.env.example).
-iac_oauth_base_url: https://sso.test.internal.net/oauth2
+iac_oauth_base_url: https://sso.lab.local/oauth2
 iac_oauth_expected_audience: kafka-test
 iac_oauth_client_ids:
   superuser: kafka-test-superuser
