@@ -49,15 +49,27 @@ iac_artifact_url: http://10.0.0.140:8888
 iac_kafka_broker_heap: "-Xms2g -Xmx2g"
 iac_control_center_heap: "-Xmx2g"
 
+# ---- TLS: source on the host, staging on the control node, destination on the host -----------------
+# 1) SOURCE: where the PKI process drops the stores on every host (rotated every 3 months, same file names).
+iac_host_keystore_path: /etc/kafka/tls/keystore.p12        # host certificate + private key
+iac_host_truststore_path: /etc/kafka/truststore.p12        # trusted CAs
 
-ssl_file_dir: /etc/kafka/ssl
-iac_host_tls_dir: /etc/kafka/tls
+# 2) STAGING: playbooks/stage-keytabs.yml pulls both files here (AWX job container); cp-ansible copies from here.
 iac_tls_stage_dir: /tmp/iac-tls
+ssl_keystore_filepath: "{{ iac_tls_stage_dir }}/{{ inventory_hostname }}/keystore.p12"
+ssl_truststore_filepath: "{{ iac_tls_stage_dir }}/{{ inventory_hostname }}/truststore.p12"
+
+# 3) MODE: use the provided stores and copy them (remote_src false); no self-signed certificates.
 ssl_custom_certs: false
 ssl_provided_keystore_and_truststore: true
 ssl_provided_keystore_and_truststore_remote_src: false
-ssl_keystore_filepath: "{{ iac_tls_stage_dir }}/{{ inventory_hostname }}/keystore.p12"
-ssl_truststore_filepath: "{{ iac_tls_stage_dir }}/{{ inventory_hostname }}/truststore.p12"
+
+# 4) DESTINATION on every host, owned by cp-ansible: it copies the pair once per component into this
+#    directory (<component>.keystore.jks / <component>.truststore.jks, PKCS12 content) and keeps the
+#    MDS token keys here. Keep it apart from the source directories.
+ssl_file_dir: /etc/kafka/ssl
+
+# 5) PASSWORDS and aliases (PKCS12: the key password equals the store password).
 ssl_keystore_store_password: "${env:IAC_SECRET_KAFKA_SSL_KEYSTORE_PASSWORD}"
 ssl_keystore_key_password: "${env:IAC_SECRET_KAFKA_SSL_KEYSTORE_PASSWORD}"
 ssl_truststore_password: "${env:IAC_SECRET_KAFKA_SSL_TRUSTSTORE_PASSWORD}"
