@@ -22,9 +22,17 @@
 - name: Post-process and copy support bundle
   hosts: control_center_next_gen
   tasks:
+    - name: Get archive file stats
+      ansible.builtin.stat:
+        path: "{{ (support_bundle_output_path | regex_replace('/$', '')) }}/{{ hostvars['localhost']['bundle_name'] }}.tar.gz"
+      register: bundle_archive_stats
+      delegate_to: localhost
+
+
     - name: Copy archive to target host
       ansible.builtin.copy:
         src: "{{ (support_bundle_output_path | regex_replace('/$', '')) }}/{{ hostvars['localhost']['bundle_name'] }}.tar.gz"
         dest: "/tmp/{{ hostvars['localhost']['bundle_name'] }}.tar.gz"
         mode: "0644"
       when: "{{ hostvars['localhost']['bundle_archive_stats']['stat']['exists'] }}"
+
