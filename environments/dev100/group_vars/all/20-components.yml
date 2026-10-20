@@ -50,6 +50,7 @@ iac_kafka_broker_heap: "-Xms2g -Xmx2g"
 iac_control_center_heap: "-Xmx2g"
 
 
+ssl_file_dir: /etc/kafka/ssl
 iac_host_tls_dir: /etc/kafka/tls
 iac_tls_stage_dir: /tmp/iac-tls
 ssl_custom_certs: false
