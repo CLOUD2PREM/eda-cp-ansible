@@ -1,0 +1,79 @@
+
+- name: Check pam_test.yml file output
+  hosts: all
+  gather_facts: true
+  tags: always
+
+  vars:
+    client_config_file: /opt/confluent/kafka.env
+
+  tasks:
+    - name: Check whether the file exists
+      ansible.builtin.stat:
+        path: "{{ client_config_file }}"
+      register: client_config_stat
+    
+    - name: Fail if the file does not exist
+      ansible.builtin.fail:
+        msg: "File {{ client_config_file }} does not exist on {{ inventory_hostname }}"
+      when: not client_config_stat.stat.exists
+    
+    - name: Read file contents
+      ansible.builtin.slurp:
+        src: "{{ client_config_file }}"
+      register: client_config_content
+      when: client_config_stat.stat.exists
+    
+    - name: Store file lines
+      ansible.builtin.set_fact:
+        client_config_lines: >-
+          {{ (client_config_content.content | b64decode).splitlines() }}
+    
+    - name: Validate that the file is not empty
+      ansible.builtin.assert:
+        that:
+          - client_config_lines | length > 0
+        fail_msg: "File {{ client_config_file }} is empty on {{ inventory_hostname }}"
+    
+    - name: Validate line format
+      ansible.builtin.assert:
+        that:
+          - item is match('^IAC_SECRET_[^=]+=.*$')
+        fail_msg: >-
+          Invalid line in {{ client_config_file }} on {{ inventory_hostname }}.
+          Each line must start with IAC_SECRET_ and contain an = separator.
+      loop: "{{ client_config_lines }}"
+      loop_control:
+        label: "{{ item.split('=')[0] if '=' in item else item }}"
+    
+    - name: Extract environment variable names
+      ansible.builtin.set_fact:
+        client_config_keys: >-
+          {{ client_config_lines
+             | map('regex_replace', '=.*$', '')
+             | list }}
+    
+    - name: Check environment variables on inventory hosts
+      ansible.builtin.command:
+        argv:
+          - printenv
+          - "{{ item }}"
+      loop: "{{ client_config_keys }}"
+      register: client_env_checks
+      changed_when: false
+      failed_when: false
+      no_log: true
+    
+    - name: Fail if an environment variable is missing
+      ansible.builtin.assert:
+        that:
+          - item.rc == 0
+        fail_msg: >-
+          Environment variable {{ item.item }} is not defined
+          on {{ inventory_hostname }}.
+        success_msg: >-
+          Environment variable {{ item.item }} exists
+          on {{ inventory_hostname }}.
+      loop: "{{ client_env_checks.results }}"
+      loop_control:
+        label: "{{ item.item }}"
