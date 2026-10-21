@@ -62,9 +62,12 @@ ssl_truststore_filepath: "/etc/kafka/truststore.p12"
 # 3) MODE: use the provided stores and copy them (remote_src false); no self-signed certificates.
 create_mds_certs: false
 ssl_custom_certs_remote_src: true
-ssl_custom_certs: true
+ssl_custom_certs: false
 ssl_provided_keystore_and_truststore: true
 ssl_provided_keystore_and_truststore_remote_src: true
+
+token_services_public_pem_file: /etc/kafka/ssl/public.pem
+token_services_private_pem_file: /etc/kafka/ssl/tokenKeypair.pem
 
 # 4) DESTINATION on every host, owned by cp-ansible: it copies the pair once per component into this
 #    directory (<component>.keystore.jks / <component>.truststore.jks, PKCS12 content) and keeps the
