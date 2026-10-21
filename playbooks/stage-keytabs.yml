@@ -23,20 +23,20 @@
 # control node, so they are pulled into the job's temporary directory first (dest = the paths cp-ansible reads:
 # ssl_keystore_filepath, ssl_truststore_filepath). cp-ansible then copies them to the destination paths
 # (one copy per component below ssl_file_dir) and sets owner and mode itself.
-- name: Stage TLS stores on the control node
-  hosts: kafka_controller:kafka_broker:schema_registry:kafka_connect:kafka_rest:control_center_next_gen
-  gather_facts: false
-  become: true
-  tags: [always]
-  tasks:
-    - name: Fetch the host keystore into the job's temporary directory
-      ansible.builtin.fetch:
-        src: "{{ iac_host_keystore_path }}"
-        dest: "{{ ssl_keystore_filepath }}"
-        flat: true
-
-    - name: Fetch the host truststore into the job's temporary directory
-      ansible.builtin.fetch:
-        src: "{{ iac_host_truststore_path }}"
-        dest: "{{ ssl_truststore_filepath }}"
-        flat: true
+#- name: Stage TLS stores on the control node
+#  hosts: kafka_controller:kafka_broker:schema_registry:kafka_connect:kafka_rest:control_center_next_gen
+#  gather_facts: false
+#  become: true
+#  tags: [always]
+#  tasks:
+#    - name: Fetch the host keystore into the job's temporary directory
+#      ansible.builtin.fetch:
+#        src: "{{ iac_host_keystore_path }}"
+#        dest: "{{ ssl_keystore_filepath }}"
+#        flat: true
+#
+#    - name: Fetch the host truststore into the job's temporary directory
+#      ansible.builtin.fetch:
+#        src: "{{ iac_host_truststore_path }}"
+#        dest: "{{ ssl_truststore_filepath }}"
+#        flat: true
