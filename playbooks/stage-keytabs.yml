@@ -33,7 +33,7 @@
       ansible.builtin.fetch:
         src: "{{ iac_host_keystore_path }}"
         dest: "{{ ssl_keystore_filepath }}"
-        flat: true#
+        flat: true
     - name: Fetch the host truststore into the job's temporary directory
       ansible.builtin.fetch:
         src: "{{ iac_host_truststore_path }}"
