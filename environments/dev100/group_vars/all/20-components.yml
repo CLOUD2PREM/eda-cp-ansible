@@ -70,7 +70,7 @@ ssl_provided_keystore_and_truststore_remote_src: true
 # 4) DESTINATION on every host, owned by cp-ansible: it copies the pair once per component into this
 #    directory (<component>.keystore.jks / <component>.truststore.jks, PKCS12 content) and keeps the
 #    MDS token keys here. Keep it apart from the source directories.
-#ssl_file_dir: /etc/kafka/ssl/test
+ssl_file_dir: /etc/kafka/ssl
 
 # 5) PASSWORDS and aliases (PKCS12: the key password equals the store password).
 ssl_keystore_store_password: "${env:IAC_SECRET_KAFKA_SSL_KEYSTORE_PASSWORD}"
