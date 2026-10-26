@@ -80,11 +80,11 @@ iac_host_certs_dir: /var/ssl/private
 iac_pki_dir: /home/cloud-user/lab-pki
 
 ssl_enabled: true
-ssl_custom_certs: true
-ssl_custom_certs_remote_src: false
-ssl_ca_cert_filepath: "{{ iac_pki_dir }}/ca/ca-chain.crt"
-ssl_signed_cert_filepath: "{{ iac_pki_dir }}/issued/current/{{ inventory_hostname }}/tls.crt"
-ssl_key_filepath: "{{ iac_pki_dir }}/issued/current/{{ inventory_hostname }}/tls.key"
+#ssl_custom_certs: true
+#ssl_custom_certs_remote_src: false
+#ssl_ca_cert_filepath: "{{ iac_pki_dir }}/ca/ca-chain.crt"
+#ssl_signed_cert_filepath: "{{ iac_pki_dir }}/issued/current/{{ inventory_hostname }}/tls.crt"
+#ssl_key_filepath: "{{ iac_pki_dir }}/issued/current/{{ inventory_hostname }}/tls.key"
 # ssl_key_password: "{{ vault_ssl_key_password }}"     # only if the private keys are encrypted
 
 # ---- Broker and KRaft authentication: SASL_SSL with SCRAM-SHA-512 and PLAIN ----------------
