@@ -145,6 +145,9 @@ iac_keytab_stage_dir: /tmp/iac-keytabs
 # (default /etc/security/keytabs/...). Broker and controller share one keytab per host, because
 # they share one principal. iac_keytab_dir and iac_kerberos_realm are set per environment.
 kafka_broker_kerberos_keytab_path: "{{ iac_keytab_stage_dir }}/{{ inventory_hostname }}/kafka.keytab"
+# Destination on the host. Not below /etc/security
+kafka_controller_keytab_path: /etc/kafka/keytabs/kafka_controller.keytab
+kafka_broker_keytab_path: /etc/kafka/keytabs/kafka_broker.keytab
 kafka_controller_kerberos_keytab_path: "{{ kafka_broker_kerberos_keytab_path }}"
 kafka_broker_kerberos_principal: "kafka/{{ inventory_hostname }}@{{ iac_kerberos_realm }}"
 kafka_controller_kerberos_principal: "{{ kafka_broker_kerberos_principal }}"
