@@ -232,5 +232,5 @@ kafka_broker_custom_properties:
   ldap.user.name.attribute: sAMAccountName
 
 
-env_config_file: /opt/confluent/kafka1.env
+env_config_file: /opt/confluent/kafka.env
 secret_id: "d68952b0-02a8-4a05-f1a4-08df2b5dc590"
