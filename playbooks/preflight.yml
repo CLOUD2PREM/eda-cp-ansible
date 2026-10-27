@@ -11,7 +11,8 @@
 # Every changing playbook imports this one, so a Tower job template runs it without any wrapper script.
 # =============================================================================
 
-
+- name: Get & check PAM secrets
+  ansible.builtin.import_playbook: get_and_check_pam_secrets.yml
 
 - name: Preflight | guard rails
   hosts: all

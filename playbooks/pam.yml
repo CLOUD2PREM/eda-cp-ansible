@@ -1,0 +1,89 @@
+---
+- name: BeyondTrust File Secret Fetch
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  become: false
+  vars:
+    ansible_become: false
+    ansible_become_method: linear
+ 
+  tasks:
+    - name: Get OAuth2 Access Token
+      ansible.builtin.uri:
+        url: "{{ bt_base_url }}/Auth/Connect/Token"
+        method: POST
+        headers:
+          Content-Type: "application/x-www-form-urlencoded"
+        body_format: form-urlencoded
+        body:
+          grant_type: "client_credentials"
+          client_id: "{{ bt_client_id }}"
+          client_secret: "{{ bt_client_secret }}"
+        status_code: 200
+        return_content: true
+      register: token_response
+ 
+    - name: Download File with Bearer Token
+      ansible.builtin.uri:
+        url: "{{ bt_base_url }}/Secrets-Safe/Secrets/{{ secret_id }}/file/download"
+        method: GET
+        headers:
+          Authorization: "Bearer {{ token_response.json.access_token }}"
+          Accept: "application/octet-stream"
+        status_code: 200
+        return_content: true
+      register: file_response
+ 
+    - name: Parse KEY=VALUE Secret Content into Dictionary
+      ansible.builtin.set_fact:
+        secret_vars_dict: >-
+          {{
+            secret_vars_dict | default({}) | combine({
+              (item.split('=', 1)[0] | trim):
+              (item.split('=', 1)[1] | trim | replace('"', '') | replace("'", ""))
+            })
+          }}
+      loop: "{{ file_response.content.splitlines() }}"
+      when:
+        - item | trim != ''
+        - not item.startswith('#')
+        - "'=' in item"
+      no_log: true
+ 
+- name: Export Environment Variables to Target Hosts
+  hosts: all
+  gather_facts: false
+  become: true # Uses pbrun or sudo as configured
+ 
+  vars:
+    target_env_dict: "{{ hostvars['localhost']['secret_vars_dict'] }}"
+ 
+  tasks:
+    - name: Persist Variables System-Wide 
+      ansible.builtin.lineinfile:
+        path: "{{ env_config_file }}"
+        create: true
+        regexp: "^#?\\s*{{ item.key }}="
+        line: '{{ item.key }}="{{ item.value }}"'
+        state: present
+      loop: "{{ target_env_dict | dict2items }}"
+      no_log: true
+ 
+    - name: Refresh Ansible Facts to Load ansible_env
+      ansible.builtin.setup:
+        filter: "ansible_env"
+ 
+    - name: Verify Loaded Variables via ansible_env
+      ansible.builtin.debug:
+        msg: "Target variables exported successfully into ansible_env."
+ 
+    - name: Verify Task Subshell Execution Environment
+      ansible.builtin.command: env
+      register: env_output
+      environment: "{{ target_env_dict }}"
+      changed_when: false
+ 
+    - name: Display Active Environment Output
+      ansible.builtin.debug:
+        var: env_output.stdout_lines
