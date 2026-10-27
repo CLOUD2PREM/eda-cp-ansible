@@ -68,7 +68,7 @@
         group: "confluent"
         mode: '0755'
         regexp: "^#?\\s*{{ item.key }}="
-        line: '{{ item.key }}="{{ item.value }}"'
+        line: '{{ item.key }}={{ item.value }}'
         state: present
       loop: "{{ target_env_dict | dict2items }}"
       no_log: true
