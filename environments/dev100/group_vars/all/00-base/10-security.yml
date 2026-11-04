@@ -140,6 +140,8 @@ kerberos_configure: false
 iac_kerberos_realm: DAHBEST.KFN
 iac_host_keytab_path: /mnt/kafka.keytab
 iac_keytab_stage_dir: /tmp/iac-keytabs
+iac_host_krb5_conf_path: /etc/krb5.conf
+kerberos_client_config_file_dest: /etc/kafka/krb/krb5.conf
 # Keytabs. *_kerberos_keytab_path is the SOURCE on the ANSIBLE CONTROL NODE (the copy module's
 # src, coll/roles/kerberos/tasks/main.yml:24-31); *_keytab_path is the destination on the host
 # (default /etc/security/keytabs/...). Broker and controller share one keytab per host, because
