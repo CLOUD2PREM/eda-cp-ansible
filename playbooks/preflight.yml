@@ -21,12 +21,6 @@
   any_errors_fatal: true
   tags: [always]
   tasks:
-    - name: Fetch the host krb5.conf into the job's temporary directory
-      ansible.builtin.fetch:
-        src: "{{ iac_host_krb5_conf_path }}"
-        dest: "{{ iac_keytab_stage_dir }}/{{ inventory_hostname }}/krb5.conf"
-        flat: true
-
     - name: debug
       ansible.builtin.debug:
         var: iac_static_validation
@@ -317,6 +311,28 @@
         - item | trim != ''
         - not item.strip().startswith('#')
 
+- name: Preflight | place krb5.conf for the Kafka JVMs
+  hosts: kafka_controller:kafka_broker:schema_registry:kafka_connect:kafka_rest:control_center_next_gen
+  gather_facts: false
+  become: true
+  tags: [always]
+  tasks:
+    - name: Create the krb5.conf directory
+      ansible.builtin.file:
+        path: "{{ kerberos_client_config_file_dest | dirname }}"
+        state: directory
+        mode: "0755"
+      when: not (iac_static_validation | default(false) | bool)
+
+    - name: Copy the OS krb5.conf to the path the JVMs read
+      ansible.builtin.copy:
+        src: "{{ iac_host_krb5_conf_path }}"
+        dest: "{{ kerberos_client_config_file_dest }}"
+        remote_src: true
+        owner: root
+        group: root
+        mode: "0644"
+      when: not (iac_static_validation | default(false) | bool)
 # - name: Install pip.conf from kafka.conf
 #   hosts: all
 #   become: true
