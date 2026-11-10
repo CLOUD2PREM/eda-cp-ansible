@@ -16,7 +16,9 @@ kafka_controller_custom_properties:
   config.providers: env
   config.providers.env.class: org.apache.kafka.common.config.provider.EnvVarConfigProvider
   config.providers.env.param.allowlist.pattern: '^IAC_SECRET_.*'
-
+  listener.name.broker.sasl.kerberos.service.name: kafka-broker
+  confluent.metadata.sasl.kerberos.service.name: kafka-broker
+  confluent.metrics.reporter.sasl.kerberos.service.name: kafka-broker
 kafka_controller_custom_client_properties:  
     config.providers: env
     config.providers.env.class: org.apache.kafka.common.config.provider.EnvVarConfigProvider
