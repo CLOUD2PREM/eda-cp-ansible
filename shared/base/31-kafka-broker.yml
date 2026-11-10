@@ -34,7 +34,7 @@ kafka_broker_custom_properties:
   ldap.java.naming.security.credentials: "${env:IAC_SECRET_LDAP_BIND_PASSWORD}"
   confluent.basic.auth.user.info: "{{ schema_registry_ldap_user }}:${env:IAC_SECRET_SCHEMA_REGISTRY_LDAP_PASSWORD}"
   kafka.rest.confluent.metadata.basic.auth.user.info: "{{ kafka_broker_ldap_user }}:${env:IAC_SECRET_KAFKA_BROKER_LDAP_PASSWORD}"
-
+  listener.name.controller.sasl.kerberos.service.name: kafka-controller
 kafka_broker_custom_client_properties:  
     config.providers: env
     config.providers.env.class: org.apache.kafka.common.config.provider.EnvVarConfigProvider
