@@ -159,6 +159,8 @@ kerberos_kafka_controller_primary: kafka-controller
 rbac_super_users:
   - User:kafka-broker
   - User:kafka-controller
+
+rbac_enabled: true
 # ldap_with_oauth: MDS authenticates users against Active Directory AND accepts tokens of the corporate
 # identity provider; CP components act as OAuth clients on the INTERNAL listener.
 auth_mode: ldap_with_oauth                     # TODO(OD-02): confirm (LDAP + OAuth) vs OAuth only
