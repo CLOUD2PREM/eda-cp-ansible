@@ -1,0 +1,50 @@
+---
+- name: Host Prerequisites
+  hosts: kafka_controller:kafka_broker:schema_registry:kafka_connect:ksql:control_center_next_gen:kafka_rest:kafka_connect_replicator:usm_agent
+  gather_facts: false
+  environment: "{{ proxy_env }}"
+  tasks:
+    - import_role:
+        name: confluent.platform.variables
+
+    - name: Create Certificate Authority and Copy to Ansible Host
+      ansible.builtin.include_tasks: confluent.platform.certificate_authority.yml
+      tags: certificate_authority
+      run_once: true
+      when: >
+        create_mds_certs|bool or
+        (self_signed|bool and
+        (kafka_broker_listeners | confluent.platform.ssl_required(ssl_enabled) or
+        kafka_broker_rest_ssl_enabled|bool or
+        schema_registry_ssl_enabled|bool or
+        kafka_rest_ssl_enabled|bool or
+        kafka_connect_ssl_enabled|bool or
+        ksql_ssl_enabled|bool or
+        control_center_next_gen_ssl_enabled|bool or
+        usm_agent_ssl_enabled|bool))
+
+    - import_role:
+        name: confluent.platform.common
+      tags: common
+    - name: Install PyYAML
+      ansible.builtin.pip:
+        name: PyYAML
+        state: present
+
+- ansible.builtin.import_playbook: confluent.platform.usm_agent
+
+- ansible.builtin.import_playbook: confluent.platform.kafka_controller
+
+- ansible.builtin.import_playbook: confluent.platform.kafka_broker
+
+- ansible.builtin.import_playbook: confluent.platform.schema_registry
+
+- ansible.builtin.import_playbook: confluent.platform.kafka_connect
+
+- ansible.builtin.import_playbook: confluent.platform.ksql
+
+- ansible.builtin.import_playbook: confluent.platform.kafka_rest
+
+- ansible.builtin.import_playbook: confluent.platform.control_center_next_gen
+
+- ansible.builtin.import_playbook: confluent.platform.kafka_connect_replicator
