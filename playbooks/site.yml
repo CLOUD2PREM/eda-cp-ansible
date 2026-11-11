@@ -10,4 +10,4 @@
   ansible.builtin.import_playbook: stage-keytabs.yml
 
 - name: Confluent Platform (pinned confluent.platform collection)
-  ansible.builtin.import_playbook: all
+  ansible.builtin.import_playbook: confluent.platform.all
