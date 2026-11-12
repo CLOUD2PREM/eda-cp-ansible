@@ -1,8 +1,6 @@
 ---
 # LAYER 1 - REST Proxy
 iac_kafka_rest_heap: "-Xms1g -Xmx1g"
-iac_kafka_rest_token_jaas: 'org.apache.kafka.common.security.oauthbearer.OAuthBearerLoginModule required username="{{ kafka_rest_ldap_user }}" password="${env:IAC_SECRET_KAFKA_REST_LDAP_PASSWORD}" metadataServerUrls="{{ mds_bootstrap_server_urls }}";'
-
 kafka_rest_service_environment_overrides:
   KAFKAREST_HEAP_OPTS: "{{ iac_kafka_rest_heap }} {{ iac_jvm_g1_opts }}"
 
@@ -12,8 +10,6 @@ kafka_rest_custom_properties:
     config.providers.env.class: org.apache.kafka.common.config.provider.EnvVarConfigProvider
     config.providers.env.param.allowlist.pattern: '^IAC_SECRET_.*'
     client.config.providers: env
-    client.sasl.jaas.config: "{{ iac_kafka_rest_token_jaas }}"
-    client.confluent.monitoring.interceptor.sasl.jaas.config: "{{ iac_kafka_rest_token_jaas }}"
-    confluent.metadata.basic.auth.user.info: "{{ kafka_rest_ldap_user }}:${env:IAC_SECRET_KAFKA_REST_LDAP_PASSWORD}"
+
 kafka_rest_service_overrides:
   EnvironmentFile: /opt/confluent/kafka.env
