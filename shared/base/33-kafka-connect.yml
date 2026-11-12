@@ -1,6 +1,7 @@
 ---
 # LAYER 1 - Kafka Connect
 iac_kafka_connect_heap: "-Xms1g -Xmx2g"
+iac_kafka_connect_token_jaas: 'org.apache.kafka.common.security.oauthbearer.OAuthBearerLoginModule required username="{{ kafka_connect_ldap_user }}" password="${env:IAC_SECRET_KAFKA_CONNECT_LDAP_PASSWORD}" metadataServerUrls="{{ mds_bootstrap_server_urls }}";'
 
 kafka_connect_service_environment_overrides:
   KAFKA_HEAP_OPTS: "{{ iac_kafka_connect_heap }}"
@@ -19,7 +20,12 @@ kafka_connect_custom_properties:
   confluent.metadata.basic.auth.user.info: "{{ kafka_connect_ldap_user }}:${env:IAC_SECRET_KAFKA_CONNECT_LDAP_PASSWORD}"
   key.converter.schema.registry.basic.auth.user.info: "{{ kafka_connect_ldap_user }}:${env:IAC_SECRET_KAFKA_CONNECT_LDAP_PASSWORD}"
   value.converter.schema.registry.basic.auth.user.info: "{{ kafka_connect_ldap_user }}:${env:IAC_SECRET_KAFKA_CONNECT_LDAP_PASSWORD}"
-  
+  sasl.jaas.config: "{{ iac_kafka_connect_token_jaas }}"
+  producer.sasl.jaas.config: "{{ iac_kafka_connect_token_jaas }}"
+  consumer.sasl.jaas.config: "{{ iac_kafka_connect_token_jaas }}"
+  producer.confluent.monitoring.interceptor.sasl.jaas.config: "{{ iac_kafka_connect_token_jaas }}"
+  consumer.confluent.monitoring.interceptor.sasl.jaas.config: "{{ iac_kafka_connect_token_jaas }}"
+  config.providers.secret.param.kafkastore.sasl.jaas.config: "{{ iac_kafka_connect_token_jaas }}"
 
 
 kafka_connect_service_overrides:
