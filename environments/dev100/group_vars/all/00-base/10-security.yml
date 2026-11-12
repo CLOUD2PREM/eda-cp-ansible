@@ -201,7 +201,7 @@ kafka_connect_ldap_password: "{{ ansible_env.IAC_SECRET_KAFKA_CONNECT_LDAP_PASSW
 kafka_rest_ldap_user: svc-kafka-proxy
 kafka_rest_ldap_password: "{{ ansible_env.IAC_SECRET_KAFKA_REST_LDAP_PASSWORD | default('') }}"
 control_center_next_gen_ldap_user: svc-kafka-controlcenter
-control_center_next_gen_ldap_password: "{{ ansible_env.IAC_SECRET_CONTROL_CENTER_NEXT_GEN_LDAP_PASSWORD | default('') }}"
+control_center_next_gen_ldap_password: "${env:IAC_SECRET_CONTROL_CENTER_NEXT_GEN_LDAP_PASSWORD}"
 schema_registry_ldap_user: svc-kafka-schemaregistry
 schema_registry_ldap_password: "{{ ansible_env.IAC_SECRET_SCHEMA_REGISTRY_LDAP_PASSWORD | default('') }}"
 
