@@ -354,3 +354,41 @@
 #     - package   
 
 
+- name: MDS token key consistency check
+  hosts: kafka_controller:kafka_broker:schema_registry:kafka_connect:kafka_rest:control_center_next_gen
+  gather_facts: false
+  become: true
+  tags: always
+  vars:
+    _auto: "{{ iac_mds_certs_autodetect | default(false) | bool }}"
+    _dir: "{{ ssl_file_dir | regex_replace('/$', '') }}"
+  tasks:
+    - name: Stat MDS public key
+      ansible.builtin.stat:
+        path: "{{ _dir }}/public.pem"
+        checksum_algorithm: sha256
+      register: iac_mds_pub
+      when: _auto | bool
+
+    - name: Stat MDS private key (sadece broker'larda)
+      ansible.builtin.stat:
+        path: "{{ _dir }}/tokenKeypair.pem"
+        checksum_algorithm: sha256
+      register: iac_mds_priv
+      when: _auto | bool and inventory_hostname in groups['kafka_broker']
+
+    - name: --limit veya düşen host varsa dur
+      ansible.builtin.assert:
+        that: ansible_play_hosts | length == ansible_play_hosts_all | length
+        fail_msg: "Tüm host'lar görülmeden karar verilemez; bu job için autodetect'i kapatıp create_mds_certs ver."
+      when: _auto | bool
+
+    - name: create_mds_certs kararı
+      ansible.builtin.set_fact:
+        create_mds_certs: >-
+          {%- set pub = ansible_play_hosts | map('extract', hostvars, 'iac_mds_pub') | map(attribute='stat') | list -%}
+          {%- set priv = groups['kafka_broker'] | map('extract', hostvars, 'iac_mds_priv') | map(attribute='stat') | list -%}
+          {{ not ((pub + priv) | selectattr('exists') | list | length == (pub + priv) | length
+                  and pub | map(attribute='checksum') | unique | length == 1
+                  and priv | map(attribute='checksum') | unique | length == 1) }}
+      when: _auto | bool
