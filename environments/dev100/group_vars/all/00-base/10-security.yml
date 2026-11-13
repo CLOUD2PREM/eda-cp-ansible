@@ -242,3 +242,4 @@ kafka_broker_custom_properties:
 
 env_config_file: /opt/confluent/kafka.env
 secret_id: "d68952b0-02a8-4a05-f1a4-08df2b5dc590"
+regenerate_token_pem: false
