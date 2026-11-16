@@ -354,3 +354,47 @@
 #     - package   
 
 
+# Decide create_mds_certs before cp-ansible runs.
+# Off by default (iac_mds_certs_autodetect: false) -> cp-ansible default behaviour.
+# On -> keep existing MDS token keys if they are identical on every host,
+#       otherwise let cp-ansible generate and distribute a new key pair.
+- name: MDS token key consistency check
+  hosts: kafka_controller:kafka_broker:schema_registry:kafka_connect:kafka_rest:control_center_next_gen
+  gather_facts: false
+  become: true              # key files are 0640 owned by cp-kafka
+  tags: always              # must also run with --tags <component>
+  vars:
+    _auto: "{{ iac_mds_certs_autodetect | default(false) | bool }}"
+    _dir: "{{ ssl_file_dir | regex_replace('/$', '') }}"
+  tasks:
+    - name: Get SHA256 of MDS public key (all RBAC component hosts)
+      ansible.builtin.stat:
+        path: "{{ _dir }}/public.pem"
+        checksum_algorithm: sha256
+      register: iac_mds_pub
+      when: _auto | bool
+
+    - name: Get SHA256 of MDS private key (brokers only)
+      ansible.builtin.stat:
+        path: "{{ _dir }}/tokenKeypair.pem"
+        checksum_algorithm: sha256
+      register: iac_mds_priv
+      when: _auto | bool and inventory_hostname in groups['kafka_broker']
+
+    - name: Ensure every host is in scope (no --limit, no failed hosts)
+      ansible.builtin.assert:
+        that: ansible_play_hosts | length == ansible_play_hosts_all | length
+        fail_msg: >-
+          MDS key autodetect needs every host. Disable iac_mds_certs_autodetect
+          for this run and set create_mds_certs explicitly.
+      when: _auto | bool
+
+    - name: Set create_mds_certs (false if keys exist and match everywhere)
+      ansible.builtin.set_fact:
+        create_mds_certs: >-
+          {%- set pub = ansible_play_hosts | map('extract', hostvars, 'iac_mds_pub') | map(attribute='stat') | list -%}
+          {%- set priv = groups['kafka_broker'] | map('extract', hostvars, 'iac_mds_priv') | map(attribute='stat') | list -%}
+          {{ not ((pub + priv) | selectattr('exists') | list | length == (pub + priv) | length
+                  and pub | map(attribute='checksum') | unique | length == 1
+                  and priv | map(attribute='checksum') | unique | length == 1) }}
+      when: _auto | bool
