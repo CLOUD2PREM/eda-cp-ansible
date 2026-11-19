@@ -156,6 +156,7 @@ kafka_broker_kerberos_principal: "svc-kafka-brokers@{{ iac_kerberos_realm }}"
 kafka_controller_kerberos_principal: "kafka-controller/{{ inventory_hostname }}@{{ iac_kerberos_realm }}"
 # ---- Authorization: RBAC + OAuth ---------------------------------------------------
 kerberos_kafka_controller_primary: kafka-controller
+kerberos_kafka_broker_primary: svc-kafka-brokers
 rbac_super_users:
   - User:svc-kafka-brokers
   - User:kafka-controller
