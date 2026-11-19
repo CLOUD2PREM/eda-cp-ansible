@@ -153,7 +153,7 @@ kafka_controller_kerberos_keytab_path: "{{ iac_keytab_stage_dir }}/{{ inventory_
 kafka_broker_keytab_path: /etc/kafka/keytabs1/kafka_broker.keytab
 kafka_controller_keytab_path: /etc/kafka/keytabs1/kafka_controller.keytab
 kafka_broker_kerberos_principal: "svc-kafka-brokers@{{ iac_kerberos_realm }}"
-kafka_controller_kerberos_principal: "kafka-controller/{{ inventory_hostname }}@{{ iac_kerberos_realm }}"
+kafka_controller_kerberos_principal: "svc-kafka-ctrls@{{ iac_kerberos_realm }}"
 # ---- Authorization: RBAC + OAuth ---------------------------------------------------
 kerberos_kafka_controller_primary: svc-kafka-ctrls
 kerberos_kafka_broker_primary: svc-kafka-brokers
