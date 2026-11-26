@@ -13,7 +13,7 @@
     - name: Fetch the broker keytab into the job's temporary directory
       ansible.builtin.fetch:
         src: "{{ iac_host_broker_keytab_path }}"
-        dest: "{{ iac_keytab_stage_dir }}/{{ inventory_hostname }}/kafka-broker.keytab"
+        dest: "{{ iac_keytab_stage_dir }}/{{ inventory_hostname }}/kafka-brokers-last.keytab"
         flat: true
       when: inventory_hostname in groups['kafka_broker']
     - name: Fetch the controller keytab into the job's temporary directory
